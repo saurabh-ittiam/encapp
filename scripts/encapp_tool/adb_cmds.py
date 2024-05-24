@@ -34,7 +34,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         print(f"Failed to run command: {cmd}")
         return False, "", ""
 
-    return ret, stdout.decode(), stderr.decode()
+    return ret, stdout.decode('latin-1'), stderr.decode('latin-1')
 
 
 def get_device_info(

@@ -5,6 +5,7 @@ import android.os.Build;
 import android.util.Log;
 import android.os.SystemClock;
 
+import com.facebook.encapp.Encoder;
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
 

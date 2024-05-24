@@ -488,7 +488,6 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         files_to_push |= {protobuf_txt_filepath}
     return test_suite, files_to_push, protobuf_txt_filepath
 
-
 def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
@@ -1102,7 +1101,7 @@ def run_codec_tests(
 
 def list_codecs(serial, model, device_workdir, debug=0):
     model_clean = model.replace(" ", "_")
-    filename = f"codecs_{model_clean}.txt"
+    filename = f"codecs_{serial}.txt"
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = {f"idb launch --udid {serial} Meta.Encapp list_codecs"}
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)

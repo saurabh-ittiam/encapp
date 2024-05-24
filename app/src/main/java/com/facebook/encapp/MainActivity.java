@@ -686,7 +686,7 @@ public class MainActivity extends AppCompatActivity {
                     final Statistics stats = coder.getStatistics();
                     stats.setAppVersion(getCurrentAppVersion());
                     try {
-                        String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
+                        String fullFilename = CliSettings.getWorkDir() + "/" +  coder.getOutputFilename() + ".json";
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, false);
                         stats.writeJSON(fw);

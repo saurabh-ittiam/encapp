@@ -2,10 +2,10 @@
 # Gradle files
 .gradle/
 build/
-
+testing
 # Local configuration file (sdk path, etc)
 local.properties
-
+tests/phase0_surface_transcode.pbtxt
 # Log/OS Files
 *.log
 

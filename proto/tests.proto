@@ -90,6 +90,19 @@ message Configure {
   optional int32 quality = 21;
   optional int32 complexity = 22;
   optional bool decode_dump = 23 [default = false];
+  enum AVCProfile {
+    constrainedBaseline = 65536;
+    baseline = 1;
+    main = 2;
+    high = 8;
+    constrainedHigh = 524288;
+  }
+  optional AVCProfile avc_profile = 24;
+  enum HEVCProfile {
+    Main = 1;
+    mainStill = 4;
+  }
+  optional HEVCProfile hevc_profile = 25;
 }
 
 message Runtime {

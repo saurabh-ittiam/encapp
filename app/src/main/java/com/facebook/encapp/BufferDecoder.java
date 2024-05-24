@@ -197,7 +197,7 @@ class BufferDecoder extends Encoder {
         File file = null;
         OutputStream fo = null;
         if (mDecodeDump) {
-            String outputYUVName = mStats.getId() + ".yuv";
+            String outputYUVName = getOutputFilename()+ ".yuv";
             Log.d(TAG, "YUV Filename: "+ outputYUVName);
             file = new File(Environment.getExternalStorageDirectory() + "/" + File.separator + outputYUVName);
             file.delete();

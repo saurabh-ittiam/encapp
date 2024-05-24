@@ -1,0 +1,23 @@
+test {
+	input {
+		filepath: "D:\\Meta_device_lab_project\\test_files\\mp4_op_files\\crf_1_mp4_op\\Animation_1080P-18f5_horizontal_clip_0_square_crf_1.mp4"
+		realtime: false
+	}
+	common {
+		id: "1_surface_transcoding_5d7fcaff0408"
+		description: "Animation_1080P-18f5_horizontal_clip_0_square_crf_1.mp4_6231kbps_main_vbr_5I_1B"
+	}
+	configure {
+		codec: "c2.android.avc.encoder"
+		bitrate: "6231 kbps"
+		bitrate_mode: vbr
+		i_frame_interval: 5
+		surface: true
+		avc_profile: main
+		parameter {
+			key: "max-bframes"
+			type: intType
+			value: "1"
+		}
+	}
+}

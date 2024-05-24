@@ -249,7 +249,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
             if (!mNoEncoding) {
                 Log.d(TAG, "Create muxer");
-                mMuxer = createMuxer(mCodec, format, true);
+                mMuxer = createMuxer(mCodec, format, false);
 
                 // This is needed.
                 boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -585,7 +585,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             mDone = true;
             mStats.stop();
             Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
-            Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
+            Log.d(TAG, "Close muxer and streams: " + getOutputFilename() + ".mp4");
             if (mMuxer != null) {
                 try {
                     mMuxer.release(); //Release calls stop

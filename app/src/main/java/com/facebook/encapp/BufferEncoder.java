@@ -128,7 +128,7 @@ class BufferEncoder extends Encoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
+        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), false);
 
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
