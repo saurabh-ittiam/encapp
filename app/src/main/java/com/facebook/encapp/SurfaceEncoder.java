@@ -56,6 +56,23 @@ class SurfaceEncoder extends Encoder {
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     private FrameswapControl mFrameSwapSurface;
 
+    static{
+        try {
+            System.loadLibrary("x264");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "Failed to load x264 library: " + e.getMessage());
+        }
+    }
+
+    private native int Create(int width, int height);
+    private native int EncodeFrame(ByteBuffer frameData, int frameSize);
+    private native void Close();
+
+    public int JNI_x264_EcoderCall(Test test) {
+        int JNIstatus = Create(1280, 720);
+        return JNIstatus;
+    }
+
     public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier) {
         super(test);
         mOutputMult = multiplier;
@@ -335,6 +352,10 @@ class SurfaceEncoder extends Encoder {
                                 Log.e(TAG, "Queue encoder failed,mess: " + isx.getMessage());
                                 return "Illegal state: " + isx.getMessage();
                             }
+                            int encodeStatus = EncodeFrame(byteBuffer, size);
+                            if (encodeStatus != 0) {
+                                return "Failed to encode frame";
+                            }
                             if (size == -2) {
                                 continue;
                             } else if (size <= 0 && !mIsCameraSource) {
@@ -414,6 +435,9 @@ class SurfaceEncoder extends Encoder {
         if (mFrameSwapSurface != null) {
             mOutputMult.removeFrameSwapControl(mFrameSwapSurface);
         }
+
+        Log.d(TAG, "Close encoder and streams");
+        Close();
 
         if (mYuvReader != null)
             mYuvReader.closeFile();

@@ -647,8 +647,11 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } else {
-                Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
-                coder = new BufferEncoder(test);
+//                Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
+//                coder = new BufferEncoder(test);
+                Log.d(TAG, "BufferX264Encoder test");
+                coder = new BufferX264Encoder(test);
+
             }
 
 
