@@ -47,7 +47,7 @@ public abstract class Encoder {
     protected static final long VIDEO_CODEC_WAIT_TIME_US = 1000; // Need to wait some time but not too long
     protected static final int VIDEO_CODEC_MAX_INPUT_SEC = 5;
     final static int WAIT_TIME_MS = 30000;  // 30 secs
-    final static int WAIT_TIME_SHORT_MS = 10000;  // 1 sec
+    final static int WAIT_TIME_SHORT_MS = 1000;  // 1 sec
     protected float mFrameRate = 30;
     float mReferenceFrameRate = 30;
     protected double mFrameTimeUsec = 0;
@@ -464,6 +464,8 @@ public abstract class Encoder {
         ConcurrentLinkedQueue<FrameBuffer> mEncodeBuffers = new ConcurrentLinkedQueue<>();
         boolean mDone = false;
 
+        int framesWritten = 0;
+
         public void stopWriter() {
             mDone = true;
         }
@@ -545,6 +547,7 @@ public abstract class Encoder {
         }
 
         public void addBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
+            mDataWriter.framesWritten++;
             mEncodeBuffers.add(new FrameBuffer(codec, id, info));
             synchronized (mEncodeBuffers) {
                 mEncodeBuffers.notifyAll();
