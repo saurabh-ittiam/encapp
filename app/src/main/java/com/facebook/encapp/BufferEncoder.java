@@ -112,6 +112,9 @@ class BufferEncoder extends Encoder {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
+        } catch(Exception e){
+            Log.e(TAG, "Unsupported profile or bitrate mode " + e.getMessage());
+            return "Failed to configure parameters";
         }
 
         try {
@@ -128,7 +131,7 @@ class BufferEncoder extends Encoder {
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
+        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), false);
 
         // This is needed.
         boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -206,14 +209,14 @@ class BufferEncoder extends Encoder {
                                 // Set EOS flag and call encoder
                                 flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                                 size = queueInputBufferEncoder(
-                                     mYuvReader,
-                                     mCodec,
-                                     byteBuffer,
-                                     index,
-                                     mInFramesCount,
-                                     flags,
-                                     mRefFramesizeInBytes,
-                                     useImage);
+                                        mYuvReader,
+                                        mCodec,
+                                        byteBuffer,
+                                        index,
+                                        mInFramesCount,
+                                        flags,
+                                        mRefFramesizeInBytes,
+                                        useImage);
                             }
 
                             if (!input_done) {

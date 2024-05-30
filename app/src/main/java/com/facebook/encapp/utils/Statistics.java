@@ -38,6 +38,7 @@ public class Statistics {
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
     private String mEncodedfile = "";
+    private String mStatus = "";
     private String mCodec;
     private long mStartTime = -1;
     private long mStopTime = -1;
@@ -258,7 +259,9 @@ public class Statistics {
     public void setEncodedfile(String filename) {
         mEncodedfile = filename;
     }
-
+    public void setStatus(String status) {
+        mStatus = status;
+    }
     public void setEncoderMediaFormat(MediaFormat format) {
         mEncoderMediaFormat = format;
     }
@@ -406,6 +409,7 @@ public class Statistics {
                     json.put("decoder_hw_accelerated", mIsDecoderHw);
                 }
             }
+            json.put("Status msg:", mStatus );
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
