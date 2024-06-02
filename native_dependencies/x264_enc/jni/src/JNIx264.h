@@ -18,12 +18,12 @@ extern "C" {
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 
+JNIEXPORT jboolean
+Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, jint width, jint height);
 JNIEXPORT jint
-Java_com_facebook_encapp_BufferX264Encoder_Create(JNIEnv *env, jobject thisObj, jint width, jint height);
-JNIEXPORT jbyteArray
-Java_com_facebook_encapp_BufferX264Encoder_EncodeFrame(JNIEnv *env, jobject thisObj, jbyteArray frameData);
+Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray inputData, jbyteArray outputData, jint size);
 JNIEXPORT void
-Java_com_facebook_encapp_BufferX264Encoder_Close(JNIEnv *env, jobject thisObj);
+Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj);
 
 #ifdef __cplusplus
 }

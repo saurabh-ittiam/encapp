@@ -3,6 +3,7 @@ package com.facebook.encapp;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
@@ -26,6 +27,7 @@ import java.util.Hashtable;
 import java.util.Locale;
 import java.util.Set;
 
+import java.io.FileInputStream;
 
 /**
  * Created by jobl on 2018-02-27.
@@ -42,17 +44,17 @@ class BufferX264Encoder extends Encoder {
         }
     }
 
-    private native int Create(int width, int height);
-    private native int EncodeFrame(ByteBuffer frameData, int frameSize);
-    private native void Close();
+    private native boolean x264Init(int width, int height);
+    private native int x264Encode(byte[] inputBuffer, byte[] outputBuffer, int frameSize);
+    private native void x264Close();
 
     public BufferX264Encoder(Test test) {
         super(test);
         mStats = new Statistics("raw encoder", mTest);
     }
 
-    public int JNI_x264_EcoderCall(Test test) {
-        int JNIstatus = Create(1280, 720);
+    public boolean init(Test mTest) {
+        boolean JNIstatus = x264Init(1280, 720);
         return JNIstatus;
     }
 
@@ -72,6 +74,11 @@ class BufferX264Encoder extends Encoder {
 
         boolean useImage = false;
 
+        boolean x264Result = init(mTest);
+        if (!x264Result) {
+            return "Failed to initialize x264 encoder";
+        }
+
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
         mSkipped = 0;
@@ -82,11 +89,6 @@ class BufferX264Encoder extends Encoder {
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
             return "Could not open file";
-        }
-
-        int x264Result = JNI_x264_EcoderCall(mTest);
-        if (x264Result != 1) {
-            return "Failed to create x264 encoder";
         }
 
         try {
@@ -123,23 +125,73 @@ class BufferX264Encoder extends Encoder {
             }
             try {
                 long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
-                index = mCodec.dequeueInputBuffer(timeoutUs);
                 int flags = 0;
-                if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
-                    input_done = true;
-                }
+//                if (doneReading(mTest, mYuvReader, mInFramesCount, mCurrentTimeSec, false)) {
+//                    input_done = true;
+//                }
                 if (mRealtime) {
                     sleepUntilNextFrame();
                 }
 
-                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(mRefFramesizeInBytes);
+                //ByteBuffer byteBuffer = ByteBuffer.allocateDirect(mRefFramesizeInBytes);
+
+                byte[] inputBuffer = new byte[mRefFramesizeInBytes];
+                byte[] outputBuffer = new byte[mRefFramesizeInBytes];
+
+                String filePath = mTest.getInput().getFilepath();
+                int size = mRefFramesizeInBytes;
+
+                FileReader fileReader = new FileReader();
+
+                if (fileReader.openFile(filePath, mTest.getInput().getPixFmt())) {
+                    int bytesRead = fileReader.fillBuffer(ByteBuffer.wrap(inputBuffer), size);
+
+                    if (bytesRead != size) {
+                        System.err.println("File read error: Expected " + size + " bytes, but read " + bytesRead + " bytes.");
+                    } else {
+                        System.out.println("File read successfully.");
+                    }
+                } else {
+                    System.err.println("Failed to open file: " + filePath);
+                }
+
+//                fileReader.setFilePath(filePath);
+//                int bytesRead = fileReader.fillBuffer(inputBuffer, size);
+
+//                byteBuffer.clear();
+//                read = fileReader.fillBuffer(byteBuffer, size);
+
+
+                //ByteBuffer inputBufferRef = byteBuffer.get(mTest.getInput().getFrame());
+
+/*                int size = -1;
+                size = queueInputBufferEncoder(
+                        mYuvReader,
+                        mCodec,
+                        inputBuffer,
+                        index,
+                        mInFramesCount,
+                        flags,
+                        mRefFramesizeInBytes,
+                        useImage);
+*/
+
+                //if (size > 0) {
+                    int encodeStatus = x264Encode(inputBuffer, outputBuffer, (int)(1280*720*1.5));
+                    if (encodeStatus == 0) {
+                        return "Failed to encode frame";
+                    }
+                    mInFramesCount++;
+                //}
+
+/*
                 int size = -1;
                 while (size < 0 && !input_done) {
                     try {
                         size = queueInputBufferEncoder(
                                 mYuvReader,
                                 mCodec,
-                                byteBuffer,
+                                inputBuffer,
                                 index,
                                 mInFramesCount,
                                 flags,
@@ -161,7 +213,7 @@ class BufferX264Encoder extends Encoder {
                             size = queueInputBufferEncoder(
                                     mYuvReader,
                                     mCodec,
-                                    byteBuffer,
+                                    inputBuffer,
                                     index,
                                     mInFramesCount,
                                     flags,
@@ -179,12 +231,12 @@ class BufferX264Encoder extends Encoder {
                 }
 
                 if (size > 0) {
-                    int encodeStatus = EncodeFrame(byteBuffer, size);
-                    if (encodeStatus != 0) {
+                    int encodeStatus = x264Encode(inputBuffer, outputBuffer, size);
+                    if (encodeStatus == 0) {
                         return "Failed to encode frame";
                     }
                 }
-
+*/
             } catch (IllegalStateException ex) {
                 Log.e(TAG, "QueueInputBuffer: IllegalStateException error");
                 ex.printStackTrace();
@@ -194,7 +246,7 @@ class BufferX264Encoder extends Encoder {
         mStats.stop();
 
         Log.d(TAG, "Close encoder and streams");
-        Close();
+        x264Close();
 
         mYuvReader.closeFile();
         return "";

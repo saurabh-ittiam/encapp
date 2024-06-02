@@ -22,6 +22,8 @@ public class FileReader {
     BufferedInputStream mBis;
     PixFmt mPixFmt;
 
+    private FileInputStream fileInputStream;
+
     public FileReader() {
     }
 

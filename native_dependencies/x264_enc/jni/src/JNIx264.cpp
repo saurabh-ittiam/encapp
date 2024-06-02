@@ -23,8 +23,7 @@ string jni_x264logfile;
 x264_t *encoder;
 x264_picture_t pic_in, pic_out;
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_facebook_encapp_BufferX264Encoder_Create(JNIEnv *env, jobject thisObj, jint width, jint height)
+JNIEXPORT jboolean Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, jint width, jint height)
 {
     x264_param_t param;
     x264_param_default(&param); // Initialize with default values
@@ -71,34 +70,33 @@ Java_com_facebook_encapp_BufferX264Encoder_Create(JNIEnv *env, jobject thisObj, 
     x264_picture_alloc(&pic_in, X264_CSP_I420, width, height);
 
     // Return a success message
-    return 1;
+    return true;
 }
 
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_facebook_encapp_BufferX264Encoder_EncodeFrame(JNIEnv *env, jobject obj, jbyteArray frameData)
+JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject obj, jbyteArray inp_buffer, jbyteArray out_buffer, jint size)
 {
-    jbyte *inputFrame = env->GetByteArrayElements(frameData, NULL);
-    int frameSize = pic_in.img.i_stride[0] * pic_in.param->i_height;
-    memcpy(pic_in.img.plane[0], inputFrame, frameSize);  // Y plane
-    memcpy(pic_in.img.plane[1], inputFrame + frameSize, frameSize / 4);  // U plane
-    memcpy(pic_in.img.plane[2], inputFrame + frameSize * 5 / 4, frameSize / 4);  // V plane
+    // Get the size of the input byte array
+    jsize inp_buffer_size = env->GetArrayLength(inp_buffer);
+    //std::cout << "inp_buffer_size : " << inp_buffer_size << std::endl;
+    // Get the size of the output byte array
+    jsize out_buffer_size = env->GetArrayLength(out_buffer);
+    //std::cout << "out_buffer_size : " << out_buffer_size << std::endl;
+
+    // Get a pointer to the elements of the input byte array
+    jbyte* inp_YuvBuffer = env->GetByteArrayElements(inp_buffer, NULL);
+    // Get a pointer to the elements of the output byte array
+    jbyte* out_YuvBuffer = env->GetByteArrayElements(out_buffer, NULL);
+
+    env->ReleaseByteArrayElements(inp_buffer, inp_YuvBuffer, JNI_ABORT);
+    env->ReleaseByteArrayElements(out_buffer, out_YuvBuffer, JNI_ABORT);
 
     x264_nal_t *nals;
     int i_nals;
     int frame_size = x264_encoder_encode(encoder, &nals, &i_nals, &pic_in, &pic_out);
-    env->ReleaseByteArrayElements(frameData, inputFrame, 0);
-
-    if (frame_size > 0) {
-        jbyteArray output = env->NewByteArray(frame_size);
-        env->SetByteArrayRegion(output, 0, frame_size, (jbyte*)nals[0].p_payload);
-        return output;
-    } else {
-        return NULL;
-    }
+    return 1;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_facebook_encapp_BufferX264Encoder_Close(JNIEnv *env, jobject obj)
+JNIEXPORT void Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject obj)
 {
     x264_picture_clean(&pic_in);
     x264_encoder_close(encoder);
