@@ -165,32 +165,35 @@ public abstract class Encoder {
     public boolean initDone() {
         return mInitDone;
     }
-
     protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
         if (!useStatId) {
             Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-            mFilename = String.format(Locale.US,"encapp_%s_%dp_%dm_%dB_%dI_%s.mp4",
-                    Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
-                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().getNumber() :
-                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().getNumber() : 0),
-                    mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().getNumber() : 0,
-                    (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
-                    mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
-                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
+            mFilename = getOutputFilename() + ".mp4";
+//            mFilename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s.mp4",
+//                    Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+//                    codec_type,
+//                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
+//                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+//                    mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+//                    (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
+//                    mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+//                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
         } else {
             mFilename = mStats.getId() + ".mp4";
         }
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase(Locale.US).contains("vp")) {
             if (!useStatId) {
-                mFilename = String.format(Locale.US,"encapp_%s_%dp_%dm_%dB_%dI_%s.webm",
-                        Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
-                        mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().getNumber() :
-                                (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().getNumber() : 0),
-                        mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().getNumber() : 0,
-                        (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
-                        mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
-                        mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
+                mFilename = getOutputFilename() + ".webm";
+//                mFilename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s.webm",
+//                        Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+//                        codec_type,
+//                        mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
+//                                (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+//                        mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+//                        (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
+//                        mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+//                        mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
             } else {
                 mFilename = mStats.getId() + ".webm";
             }
@@ -213,7 +216,28 @@ public abstract class Encoder {
     }
 
     public String getOutputFilename() {
-        return (mFilename != null && mFilename.lastIndexOf('.') > 0) ? mFilename.substring(0, mFilename.lastIndexOf('.')) : mFilename;
+        if(mFilename != null) {
+            return (mFilename.lastIndexOf('.') > 0) ? mFilename.substring(0, mFilename.lastIndexOf('.')) : mFilename;
+        }else{
+            String codec_type = "hw";
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+                codec_type = mCodec.getCodecInfo().isHardwareAccelerated()
+                        ? "hw"
+                        : ((mCodec.getCodecInfo().isSoftwareOnly() || mCodec.getCodecInfo().getName().startsWith("OMX.google"))
+                        ? "sw"
+                        : codec_type);
+            }
+            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s",
+                    Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+                    codec_type,
+                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
+                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+                    mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+                    1,
+                    mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
+            return filename;
+        }
     }
 
     @NonNull

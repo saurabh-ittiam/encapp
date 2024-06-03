@@ -7,7 +7,9 @@ import android.media.MediaFormat;
 import android.util.Log;
 import android.util.Size;
 
+import com.facebook.encapp.Encoder;
 import com.facebook.encapp.MainActivity;
+import com.facebook.encapp.SurfaceTranscoder;
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderConfigure;
@@ -23,7 +25,7 @@ import java.util.Locale;
 
 public class TestDefinitionHelper {
     private static final String TAG = "encapp";
-    public static MediaFormat buildMediaFormat(Test test) {
+    public static MediaFormat buildMediaFormat(Test test) throws Exception {
         Configure config = test.getConfigure();
         Input input = test.getInput();
         Size targetResolution = (config.hasResolution()) ?
@@ -33,21 +35,6 @@ public class TestDefinitionHelper {
         Log.d(TAG, "mime: " +  config.getMime()  + ", res = " + targetResolution);
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(
                 config.getMime(), targetResolution.getWidth(), targetResolution.getHeight());
-        /*
-        MediaCodecInfo[] codecs = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
-        boolean profileSet = false;
-        for (MediaCodecInfo codecInfo : codecs) {
-            if (profileSet)
-                break;
-            String codecName = codecInfo.getName();
-            if ((codecName.contains("avc") && codecInfo.isEncoder()) || (codecName.contains("hevc") && codecInfo.isEncoder())) {
-                MediaCodecInfo.CodecCapabilities capabilities = (codecName.contains("avc") ?
-                        codecInfo.getCapabilitiesForType("video/avc") : codecInfo.getCapabilitiesForType("video/hevc"));
-                if (capabilities.isFormatSupported(mediaFormat)){
-                    Log.e(TAG, "Media format supported");
-                }
-            }
-        }*/
         // optional config parameters
         if (config.hasBitrate()) {
             String bitrate  = config.getBitrate();
@@ -58,10 +45,10 @@ public class TestDefinitionHelper {
             mediaFormat.setFloat(MediaFormat.KEY_FRAME_RATE, framerate);
         }
         // good default: MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
-        if (config.hasBitrateMode()) {
-            int bitrateMode = config.getBitrateMode().getNumber();
-            mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
-        }
+//        if (config.hasBitrateMode()) {
+//            int bitrateMode = config.getBitrateMode().getNumber();
+//            mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+//        }
         // check if there is a durationUs value
         if (config.hasDurationUs()) {
             long duration_us = config.getDurationUs();
@@ -104,53 +91,51 @@ public class TestDefinitionHelper {
         }
         // check if there is an profile value
         MediaCodecInfo[] codecs = new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos();
-        boolean profileSet = false;
-        int profile;
         for (MediaCodecInfo codecInfo : codecs) {
-            try {
-                if (profileSet)
-                    break;
-                String codecName = codecInfo.getName();
-                if (codecName.equals(config.getCodec())) {
-                    MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(config.getMime());
+            if (codecInfo.getName().equals(config.getCodec())) {
+                MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(config.getMime());
+                int bitrateMode = 0;
+                if (config.hasBitrateMode() && (capabilities.getEncoderCapabilities().isBitrateModeSupported(config.getBitrateMode().getNumber()))) {
+                    bitrateMode = config.getBitrateMode().getNumber();
+                    mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+                } else {
+                    Log.e(TAG, "Bitrate mode " + config.getBitrateMode() + " not supported");
+                    throw new Exception(String.valueOf(config.getBitrateMode()));
+                }
+
+                if (config.hasAvcProfile() || config.hasHevcProfile()) {
                     MediaCodecInfo.CodecProfileLevel[] profileLevels = capabilities.profileLevels;
-                    /*
-                    if (capabilities.getEncoderCapabilities().isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ)) {
-                        Log.e(TAG, "Bitrate mode  CQ");
-                    }
-                    if (capabilities.getEncoderCapabilities().isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)) {
-                        Log.e(TAG, "Bitrate mode  CBR");
-                    }
-                    if (capabilities.getEncoderCapabilities().isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)) {
-                        Log.e(TAG, "Bitrate mode  VBR");
-                    }
-                    if (capabilities.isFormatSupported(mediaFormat)){
-                        Log.e(TAG, "Media format supported");
-                    }
-                    */
+                    boolean profileSet = false;
+                    int profile = -1;
+                    int highestLevel = -1;
+
                     for (MediaCodecInfo.CodecProfileLevel profileLevel : profileLevels) {
-                        int encoder_profile = profileLevel.profile;
                         if (config.getMime().contains("avc")) {
-                            if (config.hasAvcProfile() && (encoder_profile == config.getAvcProfile().getNumber())) {
+                            if (config.hasAvcProfile() && (profileLevel.profile == config.getAvcProfile().getNumber())) {
                                 profile = config.getAvcProfile().getNumber();
-                                mediaFormat.setInteger(MediaFormat.KEY_PROFILE, profile);
+                                if (profileLevel.level > highestLevel) {
+                                    highestLevel = profileLevel.level;
+                                }
                                 profileSet = true;
                             }
-                        } else if (config.getCodec().contains("hevc")) {
-                            if (config.hasHevcProfile() && (encoder_profile == config.getHevcProfile().getNumber())) {
+                        } else if (config.getMime().contains("hevc")) {
+                            if (config.hasHevcProfile() && (profileLevel.profile == config.getHevcProfile().getNumber())) {
                                 profile = config.getHevcProfile().getNumber();
-                                mediaFormat.setInteger(MediaFormat.KEY_PROFILE, profile);
+                                if (profileLevel.level > highestLevel) {
+                                    highestLevel = profileLevel.level;
+                                }
                                 profileSet = true;
                             }
-                        }else{
-                            profileSet = false;
-                            Log.e(TAG, "Profile not supported");
                         }
                     }
+                    if (profileSet) {
+                        mediaFormat.setInteger(MediaFormat.KEY_PROFILE, profile);
+                        mediaFormat.setInteger(MediaFormat.KEY_LEVEL, highestLevel);
+                    } else {
+                        Log.e(TAG, "Profile not supported: " + config.getAvcProfile());
+                        throw new Exception(String.valueOf(config.getAvcProfile()));
+                    }
                 }
-            }catch (IllegalArgumentException e) {
-                Log.e(TAG, "Profile not supported by device ");
-                e.printStackTrace();
                 break;
             }
         }

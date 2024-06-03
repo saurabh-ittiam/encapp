@@ -1,10 +1,15 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.bitrateModeToString;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.encoderCapabilitiesToString;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatToString;
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.profileLevelsToString;
 
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
@@ -21,6 +26,7 @@ import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -275,6 +281,9 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
+        } catch(Exception e){
+            Log.e(TAG, "Unsupported profile or bitrate mode: " + e.getMessage());
+            return "Failed to configure parameters profile or bitrate mode";
         }
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
