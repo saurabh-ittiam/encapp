@@ -494,7 +494,7 @@ public abstract class Encoder {
         public void stopWriter() {
             mDone = true;
         }
-
+        int framesWritten = 0;
 
         @Override
         public void run() {
@@ -572,6 +572,7 @@ public abstract class Encoder {
         }
 
         public void addBuffer(MediaCodec codec, int id, MediaCodec.BufferInfo info) {
+            mDataWriter.framesWritten++;
             mEncodeBuffers.add(new FrameBuffer(codec, id, info));
             synchronized (mEncodeBuffers) {
                 mEncodeBuffers.notifyAll();
