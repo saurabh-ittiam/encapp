@@ -33,6 +33,15 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 class BufferTranscoder extends Encoder {
     protected static final String TAG = "encapp.Buffer_transcoder";
 
+    private native int JNIDownScaler(byte[] inpBuffer, byte[] outBuffer,
+                                     int inp_fr_wd, int inp_fr_ht,
+                                     int out_fr_wd, int out_fr_ht);
+
+    static {
+        System.loadLibrary("DownScaler");
+        Log.d(TAG,"Loding lib is done");
+    }
+
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     // Flag to dump decoded YUV
@@ -60,6 +69,14 @@ class BufferTranscoder extends Encoder {
     /*For indicating too many consecutive failures while submitting decoded
     frame to encoder*/
     int failures = 0;
+    byte[] decodedYuv;
+    int inpBitstreamFrWidth = 0;
+    int inpBitstreamFrHeight = 0;
+    int actualFrSize = 0;
+    byte[] downscaleYuv;
+    int downscaledFrWidth = 0;
+    int downscaledFrHeight = 0;
+    int downscaledFrSize = 0;
 
     //Ittiam: Added for buffer encoding :end
 
@@ -74,13 +91,6 @@ class BufferTranscoder extends Encoder {
 
     public String start() {
         Log.d(TAG,"** Buffer transcoding - " + mTest.getCommon().getDescription());
-        /*try {
-            if (TestDefinitionHelper.checkBasicSettings(mTest)) {
-                mTest = TestDefinitionHelper.updateBasicSettings(mTest);
-            }
-        } catch (RuntimeException e) {
-            Log.e(TAG, "Error: " + e.getMessage());
-        }*/
 
         if(mEncoding) {
             if (mTest.hasRuntime())
@@ -162,12 +172,6 @@ class BufferTranscoder extends Encoder {
             return "Failed to create decoder";
         }
 
-        Size res = SizeUtils.parseXString(mTest.getInput().getResolution());
-        int width = res.getWidth();
-        int height = res.getHeight();
-        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
-        mRefFramesizeInBytes = (int) (width * height * 1.5);
-
         mReferenceFrameRate = mTest.getInput().getFramerate();
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
 
@@ -180,11 +184,26 @@ class BufferTranscoder extends Encoder {
         mKeepInterval = mReferenceFrameRate / mFrameRate;
 
         if (inputFormat.containsKey(MediaFormat.KEY_WIDTH)) {
-            width = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
+            inpBitstreamFrWidth = inputFormat.getInteger(MediaFormat.KEY_WIDTH);
         }
         if (inputFormat.containsKey(MediaFormat.KEY_HEIGHT)) {
-            height = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
+            inpBitstreamFrHeight = inputFormat.getInteger(MediaFormat.KEY_HEIGHT);
         }
+
+        Size res = SizeUtils.parseXString(mTest.getConfigure().getResolution());
+        downscaledFrWidth = res.getWidth();
+        downscaledFrHeight = res.getHeight();
+        if((downscaledFrWidth) == 0 || (downscaledFrHeight ==0)) {
+            downscaledFrWidth = inpBitstreamFrWidth;
+            downscaledFrHeight = inpBitstreamFrHeight;
+        }
+        // TODO(chema): this assumes 4:2:0 subsampling, and therefore YUV
+        downscaledFrSize = (int) (downscaledFrWidth * downscaledFrHeight * 1.5);
+
+        actualFrSize = (int)(inpBitstreamFrWidth*inpBitstreamFrHeight*1.5);
+        downscaleYuv = new byte[downscaledFrSize];
+        decodedYuv = new byte[actualFrSize];
+
         if(mEncoding) {
             MediaFormat mediaFormat = null;
             try {
@@ -312,6 +331,8 @@ class BufferTranscoder extends Encoder {
         Log.d(TAG, "Stop writer");
         mDataWriter.stopWriter();
 
+        downscaleYuv = null;
+        decodedYuv = null;
         return "";
     }
 
@@ -482,14 +503,21 @@ class BufferTranscoder extends Encoder {
                     if(!decOutputExtractDone) {
                         // Copy data from the decoder output buffer to the encoder input buffer
                         encInpBuffer.clear();
-                        byte[] decodedYuv = new byte[info.size];
+                        //byte[] decodedYuv = new byte[info.size];
+                        //byte[] downscaleYuv = new byte[downscaledFrSize];
                         decodedBuffer.position(info.offset);
                         decodedBuffer.limit(info.offset + info.size);
                         decodedBuffer.get(decodedYuv);
+                        if ((inpBitstreamFrWidth!=downscaledFrWidth) || (inpBitstreamFrHeight!=downscaledFrHeight)) {
+                            int retValue = JNIDownScaler(decodedYuv, downscaleYuv, inpBitstreamFrWidth, inpBitstreamFrHeight, downscaledFrWidth, downscaledFrHeight);
+                            Log.d(TAG, "JNI retValue : " + retValue);
+                            encInpBuffer.put(downscaleYuv);
+                        }else {
                         encInpBuffer.put(decodedYuv);
+                        }
                         mStats.startEncodingFrame(decodedBufferInfo.presentationTimeUs, mInFramesCount);
                         // Queue the buffer for encoding
-                        mCodec.queueInputBuffer(index, 0 /* offset */, decodedBufferInfo.size,
+                        mCodec.queueInputBuffer(index, 0 /* offset */, downscaledFrSize,
                                 decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
                         Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
                                 " submitted frame for enc: " + mInFramesCount);

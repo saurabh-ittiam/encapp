@@ -61,7 +61,6 @@ public class MainActivity extends AppCompatActivity {
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
-    boolean mBufferTranscoder = false;
     MemoryLoad mMemLoad;
     Stack<Encoder> mEncoderList = new Stack<>();
     CameraSource mCameraSource = null;
@@ -614,15 +613,18 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Decode only, use view size");
                         ot.mMult.confirmSize(ot.mView.getWidth(), ot.mView.getHeight());
                     }
-                } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface() && mBufferTranscoder) {
+                } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface()) {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] BufferDecode test");
                     coder = new BufferDecoder(test);
-                } else if(!test.getConfigure().getEncode() && !test.getConfigure().getSurface() && !mBufferTranscoder) {
+                } else {
+                    //To reach transcode path "encode" parameter should configure as "true"
+                    if (!test.getConfigure().getSurface()) {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] BufferTranscoder test");
                     coder = new BufferTranscoder(test);
                 } else {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test (alt)");
                     coder = new SurfaceTranscoder(test, new OutputMultiplier(mVsyncHandler), mVsyncHandler);
+                    }
                 }
             } else if (test.getConfigure().getSurface()) {
                 OutputMultiplier mult = null;
