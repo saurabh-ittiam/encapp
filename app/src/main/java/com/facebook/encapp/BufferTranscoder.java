@@ -191,8 +191,10 @@ class BufferTranscoder extends Encoder {
         }
 
         Size res = SizeUtils.parseXString(mTest.getConfigure().getResolution());
-        downscaledFrWidth = res.getWidth();
-        downscaledFrHeight = res.getHeight();
+        if(res!=null) {
+            downscaledFrWidth = res.getWidth();
+            downscaledFrHeight = res.getHeight();
+        }
         if((downscaledFrWidth) == 0 || (downscaledFrHeight ==0)) {
             downscaledFrWidth = inpBitstreamFrWidth;
             downscaledFrHeight = inpBitstreamFrHeight;
@@ -250,11 +252,14 @@ class BufferTranscoder extends Encoder {
             } catch (MediaCodec.CodecException cex) {
                 Log.e(TAG, "Configure failed: " + cex.getMessage());
                 return "Failed to create codec";
+            } catch(Exception e) {
+                Log.e(TAG, "Unsupported profile or bitrate mode: " + e.getMessage());
+                return "Failed to configure parameters profile or bitrate mode";
             }
 
             Log.d(TAG, "Create muxer");
             //mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-            mMuxer = createMuxer(mCodec, mediaFormat, true);
+            mMuxer = createMuxer(mCodec, mediaFormat, false);
 
             // This is needed.
             boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -300,7 +305,7 @@ class BufferTranscoder extends Encoder {
             e.printStackTrace();
         }
         mStats.stop();
-
+        Log.d(TAG, "Close muxer and streams: " + getOutputFilename() + ".mp4");
         try {
             if (mCodec != null) {
                 mCodec.flush();
