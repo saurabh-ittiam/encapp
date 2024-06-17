@@ -19,9 +19,10 @@ extern "C" {
 
 
 JNIEXPORT jboolean
-Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, jint width, jint height);
-JNIEXPORT jint
-Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray inputData, jbyteArray outputData, jint size);
+Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, jobject x264ParamsObj);
+JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject obj, jobject x264ConfigParamsObj,
+jobject x264ParamsObj, jobject x264CropRectObj, jobject x264NalObj, jobject x264AnalyseObj,
+jobject x264VuiObj, jobject x264RcObj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer, jbyteArray out_buffer, jint width, jint height);
 JNIEXPORT void
 Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj);
 

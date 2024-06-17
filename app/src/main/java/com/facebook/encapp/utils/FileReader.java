@@ -4,6 +4,8 @@ import android.graphics.ImageFormat;
 import android.media.Image;
 import android.util.Log;
 
+import com.facebook.encapp.proto.Input.PixFmt;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,9 +14,6 @@ import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
-
-import com.facebook.encapp.proto.Input.PixFmt;
-import com.facebook.encapp.utils.Assert;
 
 public class FileReader {
     private static final String TAG = "encapp.filereader";
