@@ -2,8 +2,10 @@ package com.facebook.encapp;
 
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
+import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
@@ -16,6 +18,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FrameInfo;
+import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -33,9 +36,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 class BufferTranscoder extends Encoder {
     protected static final String TAG = "encapp.Buffer_transcoder";
 
-    private native int JNIDownScaler(byte[] inpBuffer, byte[] outBuffer,
-                                     int inp_fr_wd, int inp_fr_ht,
-                                     int out_fr_wd, int out_fr_ht);
+    private native int JNIDownScaler(ByteBuffer[] inpBuffer, ByteBuffer[] outBuffer,
+                                     int inp_fr_wd, int inp_fr_ht, int[] inp_fr_stride, int inp_pix_fmt,
+                                     int out_fr_wd, int out_fr_ht, int[] out_fr_stride, int out_pix_fmt);
 
     static {
         System.loadLibrary("DownScaler");
@@ -64,20 +67,24 @@ class BufferTranscoder extends Encoder {
     MediaFormat currentEncOutputFormat = null;
     Dictionary<String, Object> latestFrameChanges = null;
 
-    ConcurrentLinkedQueue<ByteBuffer> mDecoderBuffers = new ConcurrentLinkedQueue<>();
-
     /*For indicating too many consecutive failures while submitting decoded
     frame to encoder*/
     int failures = 0;
-    byte[] decodedYuv;
     int inpBitstreamFrWidth = 0;
     int inpBitstreamFrHeight = 0;
+    int[] inpPlaneStride = new int[3];
+    ByteBuffer[] inpByteBuffArr = new ByteBuffer[3];
     int actualFrSize = 0;
-    byte[] downscaleYuv;
     int downscaledFrWidth = 0;
     int downscaledFrHeight = 0;
+    int[] downscalePlaneStride = new int[3];
+    ByteBuffer[] downscaleByteBuffArr = new ByteBuffer[3];
     int downscaledFrSize = 0;
-
+    int decPixelfmt = 0;
+    int encPixelfmt = 0;
+    boolean mediaTekChip = false;
+    int framesSubmitedToEnc = 0;
+    int framesWritten = 0;
     //Ittiam: Added for buffer encoding :end
 
     public BufferTranscoder(Test test) {
@@ -106,6 +113,10 @@ class BufferTranscoder extends Encoder {
 
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
+
+        //Check for MediaTek chip, because for MediaTek chip we must configure colour format as 420p,
+        //even if we configure flexible, we are seeing chroma corrupted bitstream
+        updateMediaTekChipflag();
 
         Log.d(TAG, "Create extractor");
         mExtractor = new MediaExtractor();
@@ -154,6 +165,14 @@ class BufferTranscoder extends Encoder {
             }
 
             Log.d(TAG, "Configure: " + mDecoder.getName());
+            //Setting decoder colour format
+            if(mediaTekChip) {
+                inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+                decPixelfmt = 19;
+            } else{
+                inputFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+                decPixelfmt = 21;
+            }
             mDecoder.configure(inputFormat, null, null, 0);
             Log.d(TAG, "MediaFormat (post-test)");
             logMediaFormat(mDecoder.getInputFormat());
@@ -191,9 +210,11 @@ class BufferTranscoder extends Encoder {
         }
 
         Size res = SizeUtils.parseXString(mTest.getConfigure().getResolution());
+        if(res != null) {
         downscaledFrWidth = res.getWidth();
         downscaledFrHeight = res.getHeight();
-        if((downscaledFrWidth) == 0 || (downscaledFrHeight ==0)) {
+        }
+        if((downscaledFrWidth == 0) || (downscaledFrHeight == 0)) {
             downscaledFrWidth = inpBitstreamFrWidth;
             downscaledFrHeight = inpBitstreamFrHeight;
         }
@@ -201,11 +222,9 @@ class BufferTranscoder extends Encoder {
         downscaledFrSize = (int) (downscaledFrWidth * downscaledFrHeight * 1.5);
 
         actualFrSize = (int)(inpBitstreamFrWidth*inpBitstreamFrHeight*1.5);
-        downscaleYuv = new byte[downscaledFrSize];
-        decodedYuv = new byte[actualFrSize];
 
         if(mEncoding) {
-            MediaFormat mediaFormat = null;
+            MediaFormat encMediaFormat = null;
             try {
                 // Unless we have a mime, do lookup
                 if (mTest.getConfigure().getMime().length() == 0) {
@@ -220,19 +239,23 @@ class BufferTranscoder extends Encoder {
                 Log.d(TAG, "Create encoder by name: " + mTest.getConfigure().getCodec());
                 mCodec = MediaCodec.createByCodecName(mTest.getConfigure().getCodec());
 
-                mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+                encMediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
                 Log.d(TAG, "MediaFormat (mTest)");
-                logMediaFormat(mediaFormat);
-                setConfigureParams(mTest, mediaFormat);
-                Log.d(TAG, "MediaFormat (configure)");
-                logMediaFormat(mediaFormat);
-                /*if (mediaFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT) == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible) {
-                    useImage = true;
+                logMediaFormat(encMediaFormat);
+                setConfigureParams(mTest, encMediaFormat);
+                //Setting encoder colour format
+                if(mediaTekChip) {
+                    encMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+                    encPixelfmt = 19;
+                } else {
+                    encMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+                    encPixelfmt = 21;
                 }
-                Log.d(TAG, "useImage: " + useImage);*/
+                Log.d(TAG, "MediaFormat (configure)");
+                logMediaFormat(encMediaFormat);
                 Log.d(TAG, "Configure: " + mCodec.getName());
                 mCodec.configure(
-                        mediaFormat,
+                        encMediaFormat,
                         null /* surface */,
                         null /* crypto */,
                         MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -254,7 +277,7 @@ class BufferTranscoder extends Encoder {
 
             Log.d(TAG, "Create muxer");
             //mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-            mMuxer = createMuxer(mCodec, mediaFormat, true);
+            mMuxer = createMuxer(mCodec, encMediaFormat, true);
 
             // This is needed.
             boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -299,40 +322,12 @@ class BufferTranscoder extends Encoder {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        mStats.stop();
 
-        try {
-            if (mCodec != null) {
-                mCodec.flush();
-                mCodec.stop();
-                mCodec.release();
-            }
-            if (mDecoder != null) {
-                mDecoder.flush();
-                mDecoder.stop();
-                mDecoder.release();
-            }
-        } catch (IllegalStateException iex) {
-            Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
-        }
-
-        Log.d(TAG, "Close muxer and streams");
-        if (mMuxer != null) {
-            try {
-                mMuxer.release(); //Release calls stop
-            } catch (IllegalStateException ise) {
-                //Most likely mean that the muxer is already released. Stupid API
-                Log.e(TAG, "Illegal state exception when trying to release the muxer");
-            }
-        }
-
-        if (mExtractor != null)
-            mExtractor.release();
-        Log.d(TAG, "Stop writer");
-        mDataWriter.stopWriter();
-
-        downscaleYuv = null;
-        decodedYuv = null;
+        stopAllActivity();
+        inpByteBuffArr = null;
+        inpPlaneStride = null;
+        downscaleByteBuffArr = null;
+        downscalePlaneStride = null;
         return "";
     }
 
@@ -340,6 +335,27 @@ class BufferTranscoder extends Encoder {
     }
 
     public void readFromBuffer(@NonNull MediaCodec codec, int index, boolean encoder, MediaCodec.BufferInfo info) {
+    }
+
+    void updateMediaTekChipflag() {
+        //From codecList in device any encoder/ decoder contains "mtk", we are setting
+        // mediaTekChip flag as true.
+        MediaCodecList codecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+        MediaCodecInfo[] codecInfos = codecList.getCodecInfos();
+        String codecName = null;
+        for (MediaCodecInfo info : codecInfos) {
+            String str = MediaCodecInfoHelper.toText(info, 1);
+            if (str.toLowerCase(Locale.US).contains("video")) {
+                codecName = info.getName();
+                if(codecName.toLowerCase(Locale.US).contains(".mtk.")) {
+                    mediaTekChip = true;
+                    break;
+                }
+                if(info.isEncoder() || mediaTekChip ) {
+                    break;
+                }
+            }
+        }
     }
 
     void bufferTranscoding(int trackIndex) throws IOException {
@@ -375,10 +391,13 @@ class BufferTranscoder extends Encoder {
             if(!encOutputExtractDone) {
                 getEncodedFrame();
             }
+            if(encOutputExtractDone){
+                Log.d(TAG, "encOutputExtractDone is true and getEncodedFrame() execution is over");
+            }
         }
         if (mDecodeDump) fo.close();
 
-        Log.d(TAG, "Decoding done, leaving decoded: " + mStats.getDecodedFrameCount());
+        //Log.d(TAG, "Decoding done, leaving decoded: " + mStats.getDecodedFrameCount());
     }
 
     void submitFrameForDecoding(int trackIndex) {
@@ -430,7 +449,7 @@ class BufferTranscoder extends Encoder {
 
                 mDecoder.queueInputBuffer(index, 0, chunkSize,
                         presentationTimeUs, flags /*flags*/);
-
+                Log.d(TAG, "submitted frame to dec : " + mInFramesCount);
                 mInFramesCount++;
                 mExtractor.advance();
             }
@@ -443,7 +462,6 @@ class BufferTranscoder extends Encoder {
     void getDecodedFrameAndSubmitForEncoding() throws IOException {
         int index;
         index = mDecoder.dequeueOutputBuffer(info, (long) mFrameTimeUsec);
-        byte[] outData = new byte[info.size];
         if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
             // no output available yet
         } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
@@ -452,35 +470,32 @@ class BufferTranscoder extends Encoder {
                 latestFrameChanges = mediaFormatComparison(currentDecOutputFormat, oformat);
                 currentDecOutputFormat = oformat;
             }
-        } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-            MediaFormat newFormat = mDecoder.getOutputFormat();
+            Log.d(TAG, "Media Format changed");
         } else if(index >= 0) {
             if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                 decOutputExtractDone = true;
+                Log.d(TAG, "decOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
                 submitFrameForEncoding(null, info);
                 Log.d(TAG, "Output EOS");
             }
-
-            ByteBuffer outputBuf = mDecoder.getOutputBuffer(index);
-            if (outputBuf != null) {
-                int limit = outputBuf.limit();
-                if(limit != 0) {
+            // Get the output buffer and wrap it in an Image object
+            Image image = mDecoder.getOutputImage(index);
+            if(image != null) {
+                // Access the planes
+                Image.Plane[] planes = image.getPlanes();
+                // Ensure planes.length == 3 for YUV format (Y, U, V planes)
+                if (planes.length == 3) {
                     FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
                     frameInfo.addInfo(latestFrameChanges);
                     latestFrameChanges = null;
-
-                    outputBuf.position(info.offset);
-                    outputBuf.limit(info.offset + info.size);
-                    outputBuf.get(outData);
-                    if (mDecodeDump) {
-                        if (file.exists()) {
-                            fo.write(outData);
-                        }
-                    }
-                    submitFrameForEncoding(outputBuf, info);
+                    getYUVByteBuffers(planes, inpByteBuffArr,inpPlaneStride, mDecodeDump);
+                } else {
+                    Log.e(TAG, "Not supported colour format");
                 }
+                submitFrameForEncoding(null, info);
             }
             try {
+                image.close();
                 mDecoder.releaseOutputBuffer(index, 0);
             } catch (IllegalStateException isx) {
                 Log.e(TAG, "Illegal state exception when trying to release output buffers");
@@ -489,7 +504,7 @@ class BufferTranscoder extends Encoder {
         if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
     }
 
-    void submitFrameForEncoding(ByteBuffer decodedBuffer, MediaCodec.BufferInfo decodedBufferInfo ) {
+    void submitFrameForEncoding(ByteBuffer decodedBuffer, MediaCodec.BufferInfo decodedBufferInfo ) throws IOException {
         int index = -1;
         long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
         while (index < 0) {
@@ -498,29 +513,30 @@ class BufferTranscoder extends Encoder {
                 Log.d(TAG, "Waiting for input queue buffer for encoding");
                 continue;
             } else if (index >=0) {
-                ByteBuffer encInpBuffer = mCodec.getInputBuffer(index);
-                if(encInpBuffer != null) {
+                Image  encInpimage = mCodec.getInputImage(index);
+                if(encInpimage != null) {
                     if(!decOutputExtractDone) {
-                        // Copy data from the decoder output buffer to the encoder input buffer
-                        encInpBuffer.clear();
-                        //byte[] decodedYuv = new byte[info.size];
-                        //byte[] downscaleYuv = new byte[downscaledFrSize];
-                        decodedBuffer.position(info.offset);
-                        decodedBuffer.limit(info.offset + info.size);
-                        decodedBuffer.get(decodedYuv);
-                        if ((inpBitstreamFrWidth!=downscaledFrWidth) || (inpBitstreamFrHeight!=downscaledFrHeight)) {
-                            int retValue = JNIDownScaler(decodedYuv, downscaleYuv, inpBitstreamFrWidth, inpBitstreamFrHeight, downscaledFrWidth, downscaledFrHeight);
-                            Log.d(TAG, "JNI retValue : " + retValue);
-                            encInpBuffer.put(downscaleYuv);
+                        // Access the planes
+                        Image.Plane[] planes = encInpimage.getPlanes();
+                        if (planes.length == 3) {
+                            getYUVByteBuffers(planes, downscaleByteBuffArr,downscalePlaneStride, false);
                         }else {
-                        encInpBuffer.put(decodedYuv);
+                            Log.e(TAG, "Not supported colour format");
                         }
+                        int retValue = JNIDownScaler(inpByteBuffArr, downscaleByteBuffArr, inpBitstreamFrWidth, inpBitstreamFrHeight, inpPlaneStride, decPixelfmt,
+                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt);
+                        if(retValue !=0) {
+                            Log.d(TAG, "JNI retValue : " + retValue);
+                        }
+
                         mStats.startEncodingFrame(decodedBufferInfo.presentationTimeUs, mInFramesCount);
                         // Queue the buffer for encoding
                         mCodec.queueInputBuffer(index, 0 /* offset */, downscaledFrSize,
                                 decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
-                        Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
-                                " submitted frame for enc: " + mInFramesCount);
+                        //Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
+                        //        " submitted frame to enc: " + mInFramesCount);
+                        Log.d(TAG, "submitted frame to enc : " + framesSubmitedToEnc);
+                        framesSubmitedToEnc++;
                     } else {
                         decodedBufferInfo.flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                         mCodec.queueInputBuffer(index, 0 /* offset */, 0, decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
@@ -553,8 +569,9 @@ class BufferTranscoder extends Encoder {
             index = mCodec.dequeueOutputBuffer(info, timeoutUs);
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 // check if the input is already done
-                if (encInpSubmitDone) {
+                if (encInpSubmitDone && (framesSubmitedToEnc==framesWritten)) {
                     encOutputExtractDone = true;
+                    Log.d(TAG, "encOutputExtractDone is set to true in 'MediaCodec.INFO_TRY_AGAIN_LATER' ");
                 }
                 // otherwise ignore
             }
@@ -575,6 +592,7 @@ class BufferTranscoder extends Encoder {
                     mCodec.releaseOutputBuffer(index, false /* render */);
                 } else if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     encOutputExtractDone = true;
+                    Log.d(TAG, "encOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
                 } else {
                     FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
                             (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
@@ -585,7 +603,9 @@ class BufferTranscoder extends Encoder {
                         ++mOutFramesCount;
                         ByteBuffer data = mCodec.getOutputBuffer(index);
                         mMuxer.writeSampleData(mVideoTrack, data, info);
-                        Log.d(TAG, "Muxer writing to file Frame No:: " + mOutFramesCount + " encoded o/p size: " +data.limit());
+                        //Log.d(TAG, "Muxer writing to file Frame No:: " + mOutFramesCount + " encoded o/p size: " +data.limit());
+                        Log.d(TAG, "Muxer writing to file Frame No:: " + framesWritten);
+                        framesWritten++;
                     }
                     mCodec.releaseOutputBuffer(index, false /* render */);
                     mCurrentTimeSec = info.presentationTimeUs / 1000000.0;
@@ -593,8 +613,72 @@ class BufferTranscoder extends Encoder {
             }
         }
     }
-    public void stopAllActivity(){}
 
+    void getYUVByteBuffers(Image.Plane[] planes, ByteBuffer[] tempPlanebuffs, int[] tempPlanestrides, boolean yuvDump) throws IOException {
+        // Update  Y,U & V plane pointers and strides
+        for(int i=0; i<planes.length;i++) {
+            tempPlanebuffs[i] = planes[i].getBuffer();
+            tempPlanestrides[i] = planes[i].getRowStride();
+            if(yuvDump && (tempPlanebuffs[i].hasRemaining())) {
+                int planeSize = tempPlanebuffs[i].remaining();
+                // Access data from the buffers
+                byte[] planeData = new byte[planeSize];
+                tempPlanebuffs[i].get(planeData);
+                if (file.exists()) {
+                    fo.write(planeData);
+                }
+                planeData = null;
+                tempPlanebuffs[i].rewind();
+            }
+        }
+    }
+    public void stopAllActivity(){
+        int waitCount = 0;
+        synchronized (this) {
+            while (framesSubmitedToEnc > framesWritten) {
+                Log.d(TAG, "Give me a sec, waiting for last encodings dec: " + framesSubmitedToEnc + " > enc: " + framesWritten);
+                try {
+                    wait(WAIT_TIME_SHORT_MS);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                waitCount++;
+                // If already waited 10 times, just break
+                if (waitCount == 10)
+                    break;
+            }
+            mStats.stop();
+            try {
+                if (mCodec != null) {
+                    mCodec.flush();
+                    mCodec.stop();
+                    mCodec.release();
+                }
+                if (mDecoder != null) {
+                    mDecoder.flush();
+                    mDecoder.stop();
+                    mDecoder.release();
+                }
+            } catch (IllegalStateException iex) {
+                Log.e(TAG, "Failed to shut down:" + iex.getLocalizedMessage());
+            }
+
+            Log.d(TAG, "Close muxer and streams");
+            if (mMuxer != null) {
+                try {
+                    mMuxer.release(); //Release calls stop
+                } catch (IllegalStateException ise) {
+                    //Most likely mean that the muxer is already released. Stupid API
+                    Log.e(TAG, "Illegal state exception when trying to release the muxer");
+                }
+            }
+
+            if (mExtractor != null)
+                mExtractor.release();
+            Log.d(TAG, "Stop writer");
+            mDataWriter.stopWriter();
+        }
+    }
     public void release() {
     }
 }
