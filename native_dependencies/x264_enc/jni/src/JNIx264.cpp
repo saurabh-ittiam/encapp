@@ -15,84 +15,37 @@ using namespace std;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
-#define MAX_FILE_NAME 1024
-#define FILTER_NAME 32
+//x264_t *encoder;
 
-string jni_x264logfile;
 
-//std::unique_ptr<x264_t> encoder;
+X264Encoder* X264Encoder::x264encoder;
 
-/*
-JNIEXPORT jboolean Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, jobject x264ParamsObj)
-{
-    jclass x264ParamsClass = env->GetObjectClass(x264ParamsObj);
-    x264_param_default(&x264Params);
-//    std::unique_ptr<x264_t> encoder = std::make_unique<x264_t>();
-//    encoder = new x264_t;
-
-    jfieldID wdFieldID = env->GetFieldID(x264ParamsClass, "wd", "I");
-    jfieldID htFieldID = env->GetFieldID(x264ParamsClass, "ht", "I");
-    jfieldID presetFieldID = env->GetFieldID(x264ParamsClass, "preset", "Ljava/lang/String;");
-    jfieldID bframesFieldID = env->GetFieldID(x264ParamsClass, "bframes", "I");
-    jfieldID threadsFieldID = env->GetFieldID(x264ParamsClass, "threads", "I");
-
-    jint wdValue = env->GetIntField(x264ParamsObj, wdFieldID);
-    jint htValue = env->GetIntField(x264ParamsObj, htFieldID);
-    jstring presetValueObj = (jstring)env->GetObjectField(x264ParamsObj, presetFieldID);
-    const char *presetValue = env->GetStringUTFChars(presetValueObj, NULL);
-    jint bframesValue = env->GetIntField(x264ParamsObj, bframesFieldID);
-    jint threadsValue = env->GetIntField(x264ParamsObj, threadsFieldID);
-
-    // Print the values of the fields
-    std::cout << "Value of wd: " << wdValue << std::endl;
-    std::cout << "Value of ht: " << htValue << std::endl;
-    std::cout << "Value of preset: " << presetValue << std::endl;
-    std::cout << "Value of bframes: " << bframesValue << std::endl;
-    std::cout << "Value of threads: " << threadsValue << std::endl;
-
-    LOGI("wd = %d", wdValue);
-    LOGI("ht = %d", htValue);
-    LOGI("presetValue = %s", presetValue);
-    LOGI("bframesValue = %d", bframesValue);
-    LOGI("threadsValue = %d", threadsValue);
-
-    x264Params.i_width = wdValue;
-    x264Params.i_height = htValue;
-    x264Params.i_threads = threadsValue;
-    x264Params.i_bframe = bframesValue;
-
-    LOGI("param.i_width = %d", x264Params.i_width);
-    LOGI("param.i_height = %d", x264Params.i_height);
-    LOGI("param.i_threads = %d", x264Params.i_threads);
-    LOGI("param.i_bframe = %d", x264Params.i_bframe);
-
-    if (x264_param_default_preset(&x264Params, presetValue, "zerolatency") < 0) {
-        LOGI("Failed to set preset: %s", presetValue);
-    // Handle the error, possibly by setting a default preset
-    } else {
-        LOGI("Preset set to: %s", presetValue);
-    }
-
-    encoder = x264_encoder_open(&x264Params);
-    x264_picture_alloc(&pic_in, X264_CSP_I420, x264Params.i_width, x264Params.i_height);
-
-    env->ReleaseStringUTFChars(presetValueObj, presetValue);
-
-    return true;
+X264Encoder& X264Encoder::getInstance() {
+    //static X264Encoder instance;
+    return *x264encoder;
 }
-*/
 
-JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject obj, jobject x264ConfigParamsObj,
-                                                                     jobject x264ParamsObj, jobject x264CropRectObj, jobject x264NalObj, jobject x264AnalyseObj,
-                                                                     jobject x264VuiObj, jobject x264RcObj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
-                                                                     jbyteArray out_buffer, jint width, jint height)
+X264Encoder::X264Encoder() : encoder(nullptr), nal(nullptr), nnal(0) {}
+
+X264Encoder::~X264Encoder() {
+    //close();
+}
+
+bool X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
+                       jobject x264ParamsObj, jobject x264CropRectObj, jobject x264NalObj, jobject x264AnalyseObj,
+                       jobject x264VuiObj, jobject x264RcObj)
 {
-    x264_t *encoder;
-    x264_picture_t pic_in = {0};
+    assert(x264encoder == NULL);
+    x264encoder = new X264Encoder();
     x264_param_t x264Params;
+    uint8_t *p, *extra_data, *sei;
+    int sei_size, s, i, extra_data_size;
 
-    x264_picture_t pic_out = {0};
+    if (!x264encoder) {
+        return false;
+    }
 
     jclass x264ConfigParamsClass = env->GetObjectClass(x264ConfigParamsObj);
     jclass x264ParamsClass = env->GetObjectClass(x264ParamsObj);
@@ -599,7 +552,11 @@ JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env
     x264Params.crop_rect.i_right = iRightValue;
     x264Params.crop_rect.i_bottom = iBottomValue;
 
-    encoder = x264_encoder_open(&x264Params);
+//jfieldID nativeEncoderPointerFieldID = getNativeEncoderPointerFieldID(env, thisObj);
+//env->SetLongField(thisObj, nativeEncoderPointerFieldID, (jlong) encoder);
+
+    x264encoder->encoder = x264_encoder_open(&x264Params);
+    x264_t *encoder = x264encoder->encoder;
     if(!encoder)
     {
         LOGI("Failed encoder_open");
@@ -609,16 +566,12 @@ JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env
 
     x264_encoder_parameters(encoder, &x264Params);
 
-    x264_nal_t *nal;
-    uint8_t *p, *extra_data;
-    uint8_t *sei;
-    int nnal, s, i, ret, extra_data_size;
-    int sei_size;
-
-    s = x264_encoder_headers(encoder, &nal, &nnal);
+    s = x264_encoder_headers(encoder, &(x264encoder->nal), &(x264encoder->nnal));
     LOGI("Passed x264_encoder_headers. Size s=%d", s);
     extra_data = p = (uint8_t *)malloc(s+64);
 
+    x264_nal_t *nal = x264encoder->nal;
+    int nnal = x264encoder->nnal;
     for (i = 0; i < nnal; i++) {
         /* Don't put the SEI in extradata. */
         if (nal[i].i_type == NAL_SEI) {
@@ -635,8 +588,36 @@ LOGI("Passed sei_size=%d", sei_size);
     }
     extra_data_size = p - extra_data;
 
+    env->ReleaseStringUTFChars(presetValueObj, presetValue);
+    env->ReleaseStringUTFChars(tuneValueObj, tuneValue);
+    env->ReleaseStringUTFChars(profileValueObj, profileValue);
+    env->ReleaseStringUTFChars(levelValueObj, levelValue);
+    env->ReleaseStringUTFChars(wpredpValueObj, wpredpValue);
+    env->ReleaseStringUTFChars(x264optsValueObj, x264optsValue);
+    env->ReleaseStringUTFChars(psyRdValueObj, psyRdValue);
+    env->ReleaseStringUTFChars(deblockValueObj, deblockValue);
+    env->ReleaseStringUTFChars(partitionsValueObj, partitionsValue);
+    env->ReleaseStringUTFChars(statsValueObj, statsValue);
+
+    return encoder != nullptr;
+}
+
+
+int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
+                        jbyteArray out_buffer, jint width, jint height)
+{
+    if (!encoder) {
+        LOGI("Encoder is not initialized for encoding");
+        return -1;
+    }
+    x264_picture_t pic_in = {0};
+    x264_picture_t pic_out = {0};
+
+//    jfieldID nativeEncoderPointerFieldID = getNativeEncoderPointerFieldID(env, thisObj);
+//    x264_t *encoder = (x264_t *) env->GetLongField(thisObj, nativeEncoderPointerFieldID);
+
     x264_picture_init(&pic_in);
-    pic_in.img.i_csp = x264Params.i_csp;
+    pic_in.img.i_csp = 2;
     pic_in.img.i_plane = 3;
 
     jsize yBuffer_size = env->GetArrayLength(yBuffer);
@@ -664,12 +645,15 @@ LOGI("First three bytes of V plane: %u, %u, %u", vInp_YuvBuffer[0], vInp_YuvBuff
     memcpy(pic_in.img.plane[1], uInp_YuvBuffer, uvSize);
     memcpy(pic_in.img.plane[2], vInp_YuvBuffer, uvSize);
 
+//pic_in.img.plane[0] = (uint8_t *)yInp_YuvBuffer;
+//pic_in.img.plane[1] = (uint8_t *)uInp_YuvBuffer;
+//pic_in.img.plane[2] = (uint8_t *)vInp_YuvBuffer;
+
     pic_in.img.i_stride[0] = width;
     pic_in.img.i_stride[1] = width / 2;
     pic_in.img.i_stride[2] = width / 2;
 
-    LOGI("x264Params.i_csp: %d", x264Params.i_csp);
-    LOGI("iCspValue: %d", iCspValue);
+    //LOGI("x264Params.i_csp: %d", x264Params.i_csp);
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
     if (frame_size >= 0) {
@@ -691,39 +675,54 @@ LOGI("First three bytes of V plane: %u, %u, %u", vInp_YuvBuffer[0], vInp_YuvBuff
             offset += nal[i].i_payload;
         }
 
-        env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
+        //env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
 
-        x264_picture_clean(&pic_in);
-        x264_encoder_close(encoder);
+        //x264_picture_clean(&pic_in);
+        //x264_encoder_close(encoder);
 
         return total_size;
     }
 
-    env->ReleaseStringUTFChars(presetValueObj, presetValue);
-    env->ReleaseStringUTFChars(tuneValueObj, tuneValue);
-    env->ReleaseStringUTFChars(profileValueObj, profileValue);
-    env->ReleaseStringUTFChars(levelValueObj, levelValue);
-    env->ReleaseStringUTFChars(wpredpValueObj, wpredpValue);
-    env->ReleaseStringUTFChars(x264optsValueObj, x264optsValue);
-    env->ReleaseStringUTFChars(psyRdValueObj, psyRdValue);
-    env->ReleaseStringUTFChars(deblockValueObj, deblockValue);
-    env->ReleaseStringUTFChars(partitionsValueObj, partitionsValue);
-    env->ReleaseStringUTFChars(statsValueObj, statsValue);
+    //env->ReleaseByteArrayElements(yBuffer, yInp_YuvBuffer, JNI_ABORT);
+    //env->ReleaseByteArrayElements(uBuffer, uInp_YuvBuffer, JNI_ABORT);
+    //env->ReleaseByteArrayElements(vBuffer, vInp_YuvBuffer, JNI_ABORT);
+    //env->ReleaseByteArrayElements(out_buffer, out_YuvBuffer, JNI_ABORT);
 
-    env->ReleaseByteArrayElements(yBuffer, yInp_YuvBuffer, JNI_ABORT);
-    env->ReleaseByteArrayElements(uBuffer, uInp_YuvBuffer, JNI_ABORT);
-    env->ReleaseByteArrayElements(vBuffer, vInp_YuvBuffer, JNI_ABORT);
-    env->ReleaseByteArrayElements(out_buffer, out_YuvBuffer, JNI_ABORT);
-
-    delete[] pic_in.img.plane[0];
-    delete[] pic_in.img.plane[1];
-    delete[] pic_in.img.plane[2];
+    //delete[] pic_in.img.plane[0];
+    //delete[] pic_in.img.plane[1];
+    //delete[] pic_in.img.plane[2];
 
     return frame_size;
 }
 
-JNIEXPORT void Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject obj)
+void X264Encoder::close(JNIEnv *env, jobject obj)
 {
+    if (encoder) {
+        x264_encoder_close(encoder);
+        encoder = nullptr;
+    }
     //x264_picture_clean(&pic_in);
-    //x264_encoder_close(encoder);
+}
+
+extern "C" {
+
+JNIEXPORT jboolean JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj, 
+                                                                               jobject x264ConfigParamsObj, jobject x264ParamsObj, 
+                                                                               jobject x264CropRectObj, jobject x264NalObj, 
+                                                                               jobject x264AnalyseObj, jobject x264VuiObj, 
+                                                                               jobject x264RcObj) {
+    return X264Encoder::init(env, thisObj, x264ConfigParamsObj, x264ParamsObj, x264CropRectObj,
+                                           x264NalObj, x264AnalyseObj, x264VuiObj, x264RcObj);
+}
+
+JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer, 
+                                                                             jbyteArray uBuffer, jbyteArray vBuffer, 
+                                                                             jbyteArray outBuffer, jint width, jint height) {
+    return X264Encoder::getInstance().encode(env, thisObj, yBuffer, uBuffer, vBuffer, outBuffer, width, height);
+}
+
+JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj) {
+    X264Encoder::getInstance().close(env, thisObj);
+}
+
 }
