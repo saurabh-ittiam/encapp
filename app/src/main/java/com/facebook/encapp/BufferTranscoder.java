@@ -280,7 +280,7 @@ class BufferTranscoder extends Encoder {
 
             Log.d(TAG, "Create muxer");
             //mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
-            mMuxer = createMuxer(mCodec, encMediaFormat, true);
+            mMuxer = createMuxer(mCodec, encMediaFormat, false);
 
             // This is needed.
             boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");

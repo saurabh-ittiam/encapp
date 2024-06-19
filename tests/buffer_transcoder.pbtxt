@@ -1,27 +1,29 @@
 test {
 	input {
-		filepath: "D:\\Meta_device_lab_project\\test_files\\mp4_op_files\\crf_1_mp4_op\\Sports_2160P-4aae_horizontal_clip_2_2160_to_1080_V_crf_1.mp4"
+		#filepath: "D:\\Meta_device_lab_project\\test_files\\mp4_op_files\\crf_1_mp4_op\\Sports_2160P-4aae_horizontal_clip_2_2160_to_1080_V_crf_1.mp4"
+		filepath: "D:\\Meta_device_lab_project\\test_files\\mp4_op_files\\crf_1_mp4_op\\Vlog_1080P-2cda_horizontal_clip_0_square_crf_1.mp4"
 		realtime: false
 		show: false
 	}
 	common {
 		id: "1_buffer_transcoding_5d7fcaff0408"
-		description: "Animation_1080P-18f5_horizontal_clip_0_square_crf_1.mp4_6231kbps_main_vbr_5I_1B"
+		description: "Vlog_1080P-2cda_horizontal_clip_0_square_crf_1.mp4_6231kbps_main_vbr_5I_1B"
 	}
 	configure {
-		codec: "OMX.MTK.VIDEO.ENCODER.AVC"
+	    codec: "c2.android.avc.encoder"
+		#codec: "OMX.qcom.video.encoder.avc"
+		#codec: "OMX.MTK.VIDEO.ENCODER.AVC"
 		bitrate: "1500 kbps"
         bitrate_mode: vbr
         i_frame_interval: 5
         surface: false
         encode: true
         avc_profile: baseline
-        resolution: "540x960"
+        #resolution: "540x720"
         parameter {
         	key: "max-bframes"
         	type: intType
         	value: "1"
         }
-        decode_dump: true
     }
 }

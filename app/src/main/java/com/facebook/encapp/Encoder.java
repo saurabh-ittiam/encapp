@@ -220,22 +220,23 @@ public abstract class Encoder {
             return (mFilename.lastIndexOf('.') > 0) ? mFilename.substring(0, mFilename.lastIndexOf('.')) : mFilename;
         }else{
             String codec_type = "hw";
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
-                codec_type = mCodec.getCodecInfo().isHardwareAccelerated()
-                        ? "hw"
-                        : ((mCodec.getCodecInfo().isSoftwareOnly() || mCodec.getCodecInfo().getName().startsWith("OMX.google"))
-                        ? "sw"
-                        : codec_type);
-            }
-            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s",
+            //            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+//                codec_type = mCodec.getCodecInfo().isHardwareAccelerated()
+//                        ? "hw"
+//                        : ((mCodec.getCodecInfo().isSoftwareOnly() || mCodec.getCodecInfo().getName().startsWith("OMX.google"))
+//                        ? "sw"
+//                        : codec_type);
+//            }
+            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s_%s",
                     Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
-                    codec_type,
+                    mTest.getConfigure().getCodec().toString().startsWith("c2.android.avc.encoder") || mTest.getConfigure().getCodec().toString().startsWith("OMX.google.h264.encoder") ? "sw" : codec_type,
                     mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
                             (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
                     mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
                     1,
                     mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
-                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
+                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0,
+                    mTest.getConfigure().hasResolution() ? mTest.getConfigure().getResolution().toString() : 0);
             return filename;
         }
     }
