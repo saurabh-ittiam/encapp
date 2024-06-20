@@ -17,20 +17,16 @@ using namespace std;
 #include <string.h>
 #include <assert.h>
 
-//x264_t *encoder;
-
-
 X264Encoder* X264Encoder::x264encoder;
 
 X264Encoder& X264Encoder::getInstance() {
-    //static X264Encoder instance;
     return *x264encoder;
 }
 
 X264Encoder::X264Encoder() : encoder(nullptr), nal(nullptr), nnal(0) {}
 
 X264Encoder::~X264Encoder() {
-    //close();
+    close();
 }
 
 bool X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
@@ -517,8 +513,8 @@ bool X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj
     x264Params.analyse.b_psy = bPsyValue;
     x264Params.analyse.b_mb_info = bMbInfoValue;
     x264Params.analyse.b_mb_info_update = bMbInfoUpdateValue;
-    x264Params.analyse.i_luma_deadzone[0] = 0; // Assuming inter
-    x264Params.analyse.i_luma_deadzone[1] = 0; // Assuming intra
+    x264Params.analyse.i_luma_deadzone[0] = 0;
+    x264Params.analyse.i_luma_deadzone[1] = 0;
     x264Params.analyse.b_psnr = bPsnrValue;
     x264Params.analyse.b_ssim = bSsimValue;
 
@@ -552,9 +548,6 @@ bool X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj
     x264Params.crop_rect.i_right = iRightValue;
     x264Params.crop_rect.i_bottom = iBottomValue;
 
-//jfieldID nativeEncoderPointerFieldID = getNativeEncoderPointerFieldID(env, thisObj);
-//env->SetLongField(thisObj, nativeEncoderPointerFieldID, (jlong) encoder);
-
     x264encoder->encoder = x264_encoder_open(&x264Params);
     x264_t *encoder = x264encoder->encoder;
     if(!encoder)
@@ -576,7 +569,6 @@ bool X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj
         /* Don't put the SEI in extradata. */
         if (nal[i].i_type == NAL_SEI) {
             sei_size = nal[i].i_payload;
-LOGI("Passed sei_size=%d", sei_size);
             sei      = (uint8_t *)malloc(sei_size);
             if (!sei)
                 return 0;
@@ -604,7 +596,7 @@ LOGI("Passed sei_size=%d", sei_size);
 
 
 int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
-                        jbyteArray out_buffer, jint width, jint height)
+                        jbyteArray out_buffer, jint width, jint height, jobjectArray headerArray)
 {
     if (!encoder) {
         LOGI("Encoder is not initialized for encoding");
@@ -612,9 +604,6 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     }
     x264_picture_t pic_in = {0};
     x264_picture_t pic_out = {0};
-
-//    jfieldID nativeEncoderPointerFieldID = getNativeEncoderPointerFieldID(env, thisObj);
-//    x264_t *encoder = (x264_t *) env->GetLongField(thisObj, nativeEncoderPointerFieldID);
 
     x264_picture_init(&pic_in);
     pic_in.img.i_csp = 2;
@@ -630,10 +619,6 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     jbyte* vInp_YuvBuffer = env->GetByteArrayElements(vBuffer, NULL);
     jbyte* out_YuvBuffer = env->GetByteArrayElements(out_buffer, NULL);
 
-LOGI("First three bytes of Y plane: %u, %u, %u", yInp_YuvBuffer[0], yInp_YuvBuffer[1], yInp_YuvBuffer[2]);
-LOGI("First three bytes of U plane: %u, %u, %u", uInp_YuvBuffer[0], uInp_YuvBuffer[1], uInp_YuvBuffer[2]);
-LOGI("First three bytes of V plane: %u, %u, %u", vInp_YuvBuffer[0], vInp_YuvBuffer[1], vInp_YuvBuffer[2]);
-
     jint ySize = width * height;
     jint uvSize = width * height / 4;
 
@@ -645,15 +630,10 @@ LOGI("First three bytes of V plane: %u, %u, %u", vInp_YuvBuffer[0], vInp_YuvBuff
     memcpy(pic_in.img.plane[1], uInp_YuvBuffer, uvSize);
     memcpy(pic_in.img.plane[2], vInp_YuvBuffer, uvSize);
 
-//pic_in.img.plane[0] = (uint8_t *)yInp_YuvBuffer;
-//pic_in.img.plane[1] = (uint8_t *)uInp_YuvBuffer;
-//pic_in.img.plane[2] = (uint8_t *)vInp_YuvBuffer;
-
     pic_in.img.i_stride[0] = width;
     pic_in.img.i_stride[1] = width / 2;
     pic_in.img.i_stride[2] = width / 2;
 
-    //LOGI("x264Params.i_csp: %d", x264Params.i_csp);
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
     if (frame_size >= 0) {
@@ -674,34 +654,29 @@ LOGI("First three bytes of V plane: %u, %u, %u", vInp_YuvBuffer[0], vInp_YuvBuff
             memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
             offset += nal[i].i_payload;
         }
-
-        //env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
-
-        //x264_picture_clean(&pic_in);
-        //x264_encoder_close(encoder);
-
+        // Fill headerArray with SPS and PPS if not already set
+        if (headerArray != nullptr) {
+            x264_encoder_headers(encoder, &nal, &nnal);
+            for (int i = 0; i < nnal; i++) {
+                if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS) {
+                    jbyteArray header = env->NewByteArray(nal[i].i_payload);
+                    env->SetByteArrayRegion(header, 0, nal[i].i_payload, reinterpret_cast<jbyte*>(nal[i].p_payload));
+                    env->SetObjectArrayElement(headerArray, i, header);
+                }
+            }
+        }
         return total_size;
     }
-
-    //env->ReleaseByteArrayElements(yBuffer, yInp_YuvBuffer, JNI_ABORT);
-    //env->ReleaseByteArrayElements(uBuffer, uInp_YuvBuffer, JNI_ABORT);
-    //env->ReleaseByteArrayElements(vBuffer, vInp_YuvBuffer, JNI_ABORT);
-    //env->ReleaseByteArrayElements(out_buffer, out_YuvBuffer, JNI_ABORT);
-
-    //delete[] pic_in.img.plane[0];
-    //delete[] pic_in.img.plane[1];
-    //delete[] pic_in.img.plane[2];
 
     return frame_size;
 }
 
-void X264Encoder::close(JNIEnv *env, jobject obj)
+void X264Encoder::close()
 {
     if (encoder) {
         x264_encoder_close(encoder);
         encoder = nullptr;
     }
-    //x264_picture_clean(&pic_in);
 }
 
 extern "C" {
@@ -717,12 +692,12 @@ JNIEXPORT jboolean JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Init(J
 
 JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer, 
                                                                              jbyteArray uBuffer, jbyteArray vBuffer, 
-                                                                             jbyteArray outBuffer, jint width, jint height) {
-    return X264Encoder::getInstance().encode(env, thisObj, yBuffer, uBuffer, vBuffer, outBuffer, width, height);
+                                                                             jbyteArray outBuffer, jint width, jint height, jobjectArray headerArray) {
+    return X264Encoder::getInstance().encode(env, thisObj, yBuffer, uBuffer, vBuffer, outBuffer, width, height, headerArray);
 }
 
 JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj) {
-    X264Encoder::getInstance().close(env, thisObj);
+    X264Encoder::getInstance().close();
 }
 
 }

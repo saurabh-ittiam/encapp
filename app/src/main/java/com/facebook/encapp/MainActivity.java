@@ -25,9 +25,11 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.proto.TestSuite;
 import com.facebook.encapp.utils.CameraSource;
@@ -40,20 +42,17 @@ import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import com.google.protobuf.TextFormat;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
-import android.media.MediaCodec;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";

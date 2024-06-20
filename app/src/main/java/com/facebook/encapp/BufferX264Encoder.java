@@ -1,9 +1,12 @@
 package com.facebook.encapp;
 
+import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
+
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
+import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
 import android.util.Size;
@@ -12,6 +15,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
+import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -634,14 +638,12 @@ class BufferX264Encoder extends Encoder {
         }
     }
 
-    private long nativeEncoderPointer;
     public static native boolean x264Init(X264ConfigParams x264ConfigParamsInstance, X264Params x264ParamsInstance, X264Params.crop_rect cropRectInstance, X264Nal x264NalInstance,  X264Params.analyse analyseInstance, X264Params.vui vuiInstance, X264Params.rc rcInstance);
-    public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer, byte[] outputBuffer, int width, int height);
+    public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer, byte[] outputBuffer, int width, int height, byte[][] headerArray);
     public static native void x264Close();
 
     public BufferX264Encoder(Test test) {
         super(test);
-        nativeEncoderPointer = 0;
         mStats = new Statistics("raw encoder", mTest);
     }
 
@@ -657,7 +659,6 @@ class BufferX264Encoder extends Encoder {
             ByteBuffer buffer = ByteBuffer.wrap(inputBuffer);
             int bytesRead = channel.read(buffer);
             if (bytesRead < size) {
-                //throw new IOException("File size does not match expected size");
                 return null;
             }
         }
@@ -677,6 +678,48 @@ class BufferX264Encoder extends Encoder {
         System.arraycopy(yuvData, frameSize + qFrameSize, vPlane, 0, qFrameSize);
 
         return new byte[][]{yPlane, uPlane, vPlane};
+    }
+
+    private int findStartCodePrefix(byte[] frame) {
+        // Look for the start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
+        for (int i = 0; i < frame.length - 4; i++) {
+            if (frame[i] == 0x00 && frame[i + 1] == 0x00 && frame[i + 2] == 0x01) {
+                return i;
+            }
+            if (frame[i] == 0x00 && frame[i + 1] == 0x00 && frame[i + 2] == 0x00 && frame[i + 3] == 0x01) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    private boolean checkIfKeyFrame(byte[] frame) {
+        // H.264 NAL unit type for IDR frames (key frames) is 5
+        final byte NAL_UNIT_TYPE_IDR = 5;
+
+        // H.264 frames start with a start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
+        // followed by the NAL unit header.
+
+        // NAL unit header format (first byte after the start code prefix):
+        // +---------------+
+        // |0|1|2|3|4|5|6|7|
+        // +-+-+-+-+-+-+-+-+
+        // |F|NRI|  Type   |
+        // +---------------+
+        // F: forbidden_zero_bit (1 bit) - must be 0
+        // NRI: nal_ref_idc (2 bits) - nal reference indicator
+        // Type: nal_unit_type (5 bits)
+
+        // Find the start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
+        int startIndex = findStartCodePrefix(frame);
+        if (startIndex == -1 || startIndex + 4 >= frame.length) {
+            return false; // Invalid frame or no start code prefix found
+        }
+
+        // The NAL unit type is in the lower 5 bits of the byte following the start code prefix
+        byte nalUnitHeader = frame[startIndex + 4];
+        int nalUnitType = nalUnitHeader & 0x1F;
+
+        return nalUnitType == NAL_UNIT_TYPE_IDR;
     }
 
     public String start() {
@@ -711,7 +754,7 @@ class BufferX264Encoder extends Encoder {
         int i_first_mb = 10;
         int i_last_mb = 20;
         int i_payload = 100;
-        byte[] p_payload = new byte[100]; // Example payload array
+        byte[] p_payload = new byte[100];
         int i_padding = 5;
 
         int cpu = 34234;
@@ -906,7 +949,6 @@ class BufferX264Encoder extends Encoder {
         int roi_warned = 0;
         String psz_zones = "zones";
 
-        // Create an instance of X264ConfigParams
         X264ConfigParams x264ConfigParamsInstance = new X264ConfigParams(
                 sei, sei_size, preset, tune, profile, level, fastfirstpass, wpredp, x264opts, crf, crf_max, cqp, aq_mode,
                 aq_strength, psy_rd, psy, rc_lookahead, weightp, weightb, ssim, intra_refresh, bluray_compat, b_bias,
@@ -946,13 +988,6 @@ class BufferX264Encoder extends Encoder {
         logMediaFormat(mediaFormat);
         setConfigureParams(mTest, mediaFormat);
 
-        try {
-            Log.d(TAG, "Start encoder");
-        } catch (Exception ex) {
-            Log.e(TAG, "Start failed: " + ex.getMessage());
-            return "Start encoding failed";
-        }
-
         float mReferenceFrameRate = mTest.getInput().getFramerate();
         mKeepInterval = mReferenceFrameRate / mFrameRate;
         mRefFrameTime = calculateFrameTimingUsec(mReferenceFrameRate);
@@ -967,9 +1002,8 @@ class BufferX264Encoder extends Encoder {
             }
         }
         mStats.start();
-        int current_loop = 1;
 
-        String outputStreamName = "output_singleton.x264";
+        String outputStreamName = "x264_output.mp4";
         File file = new File(Environment.getExternalStorageDirectory(), outputStreamName);
 
         // Ensure the parent directory exists
@@ -980,6 +1014,7 @@ class BufferX264Encoder extends Encoder {
 
         try {
             FileOutputStream fileOutputStream = new FileOutputStream(file);
+
             x264Init(x264ConfigParamsInstance, x264ParamsInstance, cropRectInstance, x264NalInstance,
                     analyseInstance, vuiInstance, rcInstance);
 
@@ -989,17 +1024,22 @@ class BufferX264Encoder extends Encoder {
             MediaMuxer muxer = null;
             int videoTrackIndex = -1;
             boolean muxerStarted = false;
+            int frameSize = i_width * i_height * 3 / 2;
+            byte[] outputBuffer = new byte[frameSize];
+            byte[][] headerArray = new byte[2][];
+            int outputBufferSize;
+
+            muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
 
             while (!input_done || !output_done) {
                 try {
                     long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
                     int flags = 0;
+                    String filePath = mTest.getInput().getFilepath();
+
                     if (mRealtime) {
                         sleepUntilNextFrame();
                     }
-                    int frameSize = i_width * i_height * 3 / 2;
-                    byte[] outputBuffer = new byte[frameSize];
-                    String filePath = mTest.getInput().getFilepath();
 
                     try {
                         byte[] yuvData = readYUVFromFile(filePath, frameSize, currentFramePosition);
@@ -1007,65 +1047,96 @@ class BufferX264Encoder extends Encoder {
                         if (yuvData == null) {
                             input_done = true;
                             output_done = true;
-                            Log.d(TAG, "From if (yuvData == null)");
                             continue;
                         }
 
                         byte[][] planes = extractYUVPlanes(yuvData, i_width, i_height);
 
-                        int encodeStatus = x264Encode(planes[0], planes[1], planes[2], outputBuffer, i_width, i_height);
-                        if (encodeStatus == 0) {
+                        outputBufferSize = x264Encode(planes[0], planes[1], planes[2], outputBuffer, i_width, i_height, headerArray);
+                        if (outputBufferSize == 0) {
                             return "Failed to encode frame";
                         }
 
-                        fileOutputStream.write(outputBuffer);
-                        Log.d(TAG, "Successfully written to " + outputStreamName);
+                        //int callMuxer = muxFrame(outputBuffer, i_width, i_height, headerArray);
 
                         mFramesAdded++;
                         currentFramePosition += frameSize;
-
-                        if (!muxerStarted) {
-                            MediaFormat format = MediaFormat.createVideoFormat("video/avc", i_width, i_height);
-                            format.setInteger(MediaFormat.KEY_BIT_RATE, 125000);
-                            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5);
-
-                            muxer = new MediaMuxer(Environment.getExternalStorageDirectory() + "/output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-                            videoTrackIndex = muxer.addTrack(format);
-                            muxer.start();
-                            muxerStarted = true;
-                        }
-
-                        // Write the encoded data to the muxer
-                        ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
-                        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-                        bufferInfo.offset = 0;
-                        bufferInfo.size = outputBuffer.length;
-                        bufferInfo.presentationTimeUs = computePresentationTimeUs(mFramesAdded);
-                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
-
-                        muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
-                        //input_done = false;
+                        fileOutputStream.write(outputBuffer, 0, outputBufferSize);
+                        Log.d(TAG, "Successfully written to " + outputStreamName);
                     } catch (IOException e) {
                         e.printStackTrace();
+                        return e.getMessage();
                     }
                 } catch (IllegalStateException ex) {
                     Log.e(TAG, "QueueInputBuffer: IllegalStateException error");
                     ex.printStackTrace();
-                    return "QueueInputBuffer: IllegalStateException error";
+                    return ex.getMessage();
+                }
+
+                try {
+                    if (!muxerStarted) {
+                        MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, i_width, i_height);
+//                            format.setInteger(MediaFormat.KEY_WIDTH, i_width);
+//                            format.setInteger(MediaFormat.KEY_HEIGHT, i_height);
+//                            format.setInteger(MediaFormat.KEY_BIT_RATE, 125000);
+//                            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+//                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+//                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, -1);
+//                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, 0);
+                        format.setInteger(MediaFormat.KEY_WIDTH, i_width);
+                        format.setInteger(MediaFormat.KEY_HEIGHT, i_height);
+//                            format.setInteger(MediaFormat.KEY_M , 800000);
+                        format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
+                        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
+//                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+//                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+//                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
+
+                        if (headerArray[0] != null && headerArray[1] != null) {
+                            ByteBuffer sps = ByteBuffer.wrap(headerArray[0]);
+                            ByteBuffer pps = ByteBuffer.wrap(headerArray[1]);
+                            format.setByteBuffer("csd-0", sps);
+                            format.setByteBuffer("csd-1", pps);
+                        }
+
+                        videoTrackIndex = muxer.addTrack(format);
+                        muxer.start();
+                        muxerStarted = true;
+                    }
+
+                    ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
+                    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+                    bufferInfo.offset = 0;
+                    bufferInfo.size = outputBufferSize;
+                    bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
+
+                    //boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                    //if (isKeyFrame) {
+                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                    //}
+                    //FrameInfo frameInfo = mStats.stopEncodingFrame(bufferInfo.presentationTimeUs, bufferInfo.size,
+                    //        (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+
+                    muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                } catch (MediaCodec.CodecException ex) {
+                    Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
+                    ex.printStackTrace();
+                    return "dequeueOutputBuffer: MediaCodec.CodecException error";
                 }
             }
             mStats.stop();
 
             Log.d(TAG, "Close encoder and streams");
             x264Close();
+            fileOutputStream.close();
 
             if (muxer != null) {
-                muxer.stop();
-                muxer.release();
+                try {
+                    muxer.release();
+                } catch (IllegalStateException ise) {
+                    Log.e(TAG, "Illegal state exception when trying to release the muxer");
+                }
             }
-
         } catch (Exception ex) {
             return ex.getMessage();
         }
