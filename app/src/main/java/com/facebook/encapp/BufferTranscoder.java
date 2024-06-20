@@ -480,28 +480,34 @@ class BufferTranscoder extends Encoder {
                 Log.d(TAG, "decOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
                 submitFrameForEncoding(null, info);
                 Log.d(TAG, "Output EOS");
-            }
-            // Get the output buffer and wrap it in an Image object
-            Image image = mDecoder.getOutputImage(index);
-            if(image != null) {
-                // Access the planes
-                Image.Plane[] planes = image.getPlanes();
-                // Ensure planes.length == 3 for YUV format (Y, U, V planes)
-                if (planes.length == 3) {
-                    FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
-                    frameInfo.addInfo(latestFrameChanges);
-                    latestFrameChanges = null;
-                    getYUVByteBuffers(planes, inpByteBuffArr,inpPlaneStride, mDecodeDump);
-                } else {
-                    Log.e(TAG, "Not supported colour format");
+                try {
+                    mDecoder.releaseOutputBuffer(index, 0);
+                } catch (IllegalStateException isx) {
+                    Log.e(TAG, "Illegal state exception when trying to release output buffers");
                 }
-                submitFrameForEncoding(null, info);
-            }
-            try {
-                image.close();
-                mDecoder.releaseOutputBuffer(index, 0);
-            } catch (IllegalStateException isx) {
-                Log.e(TAG, "Illegal state exception when trying to release output buffers");
+            } else {
+                // Get the output buffer and wrap it in an Image object
+                Image image = mDecoder.getOutputImage(index);
+                if (image != null) {
+                    // Access the planes
+                    Image.Plane[] planes = image.getPlanes();
+                    // Ensure planes.length == 3 for YUV format (Y, U, V planes)
+                    if (planes.length == 3) {
+                        FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
+                        frameInfo.addInfo(latestFrameChanges);
+                        latestFrameChanges = null;
+                        getYUVByteBuffers(planes, inpByteBuffArr, inpPlaneStride, mDecodeDump);
+                    } else {
+                        Log.e(TAG, "Not supported colour format");
+                    }
+                    submitFrameForEncoding(null, info);
+                }
+                try {
+                    image.close();
+                    mDecoder.releaseOutputBuffer(index, 0);
+                } catch (IllegalStateException isx) {
+                    Log.e(TAG, "Illegal state exception when trying to release output buffers");
+                }
             }
         }
         if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
@@ -599,7 +605,6 @@ class BufferTranscoder extends Encoder {
                 } else {
                     FrameInfo frameInfo = mStats.stopEncodingFrame(info.presentationTimeUs, info.size,
                             (info.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
-                    //++mOutFramesCount;
                     frameInfo.addInfo(latestFrameChanges);
                     latestFrameChanges = null;
                     if (mMuxer != null && mVideoTrack != -1) {
@@ -651,6 +656,7 @@ class BufferTranscoder extends Encoder {
                     break;
             }
             mStats.stop();
+            Log.d(TAG, "Submitted frames to enc: " + framesSubmitedToEnc + " extracted frames from enc " + framesWritten);
             try {
                 if (mCodec != null) {
                     mCodec.flush();
