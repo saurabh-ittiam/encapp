@@ -405,13 +405,13 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
-                            mDropNext = true;
+                            mDropNext = false;
                             mDropcount++;
                         } else {
                             mDropcount = 0;
                         }
                     }
-                    if (mDropNext) {
+                    if (false) {
                         mSkipped++;
                         mDropNext = false;
                         codec.releaseOutputBuffer(index, false);
