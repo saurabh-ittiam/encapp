@@ -542,7 +542,7 @@ class BufferTranscoder extends Encoder {
                             Log.e(TAG, "Not supported colour format");
                         }
                         int retValue = JNIDownScaler(inpByteBuffArr, downscaleByteBuffArr, inpBitstreamFrWidth, inpBitstreamFrHeight, inpPlaneStride, decPixelfmt,
-                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt);
+                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt, downscaleFilterName);
                         if(retValue !=0) {
                             Log.d(TAG, "JNI retValue : " + retValue);
                         }
@@ -666,6 +666,7 @@ class BufferTranscoder extends Encoder {
                     break;
             }
             mStats.stop();
+            Log.d(TAG, "Submitted frames to enc: " + framesSubmitedToEnc + " extracted frames from enc " + framesWritten);
             try {
                 if (mCodec != null) {
                     mCodec.flush();
