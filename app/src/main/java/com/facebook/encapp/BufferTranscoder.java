@@ -38,7 +38,8 @@ class BufferTranscoder extends Encoder {
 
     private native int JNIDownScaler(ByteBuffer[] inpBuffer, ByteBuffer[] outBuffer,
                                      int inp_fr_wd, int inp_fr_ht, int[] inp_fr_stride, int inp_pix_fmt,
-                                     int out_fr_wd, int out_fr_ht, int[] out_fr_stride, int out_pix_fmt);
+                                     int out_fr_wd, int out_fr_ht, int[] out_fr_stride, int out_pix_fmt,
+                                     String downscale_filter);
 
     static {
         System.loadLibrary("DownScaler");
@@ -85,6 +86,10 @@ class BufferTranscoder extends Encoder {
     boolean mediaTekChip = false;
     int framesSubmitedToEnc = 0;
     int framesWritten = 0;
+
+    //downscale FilterName can be "bicubic" or "lanczos"
+    //By default is "lanczos"
+    String downscaleFilterName = null;
     //Ittiam: Added for buffer encoding :end
 
     public BufferTranscoder(Test test) {
@@ -114,6 +119,10 @@ class BufferTranscoder extends Encoder {
         mFrameRate = mTest.getConfigure().getFramerate();
         mWriteFile = !mTest.getConfigure().hasEncode() || mTest.getConfigure().getEncode();
 
+        downscaleFilterName = mTest.getConfigure().getDownscaleFilter();
+        if(downscaleFilterName == null) {
+            downscaleFilterName = "lanczos";
+        }
         //Check for MediaTek chip, because for MediaTek chip we must configure colour format as 420p,
         //even if we configure flexible, we are seeing chroma corrupted bitstream
         updateMediaTekChipflag();
@@ -477,7 +486,12 @@ class BufferTranscoder extends Encoder {
                 Log.d(TAG, "decOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
                 submitFrameForEncoding(null, info);
                 Log.d(TAG, "Output EOS");
+                try {
+                    mDecoder.releaseOutputBuffer(index, 0);
+                } catch (IllegalStateException isx) {
+                    Log.e(TAG, "Illegal state exception when trying to release output buffers");
             }
+            } else {
             // Get the output buffer and wrap it in an Image object
             Image image = mDecoder.getOutputImage(index);
             if(image != null) {
@@ -500,6 +514,7 @@ class BufferTranscoder extends Encoder {
             } catch (IllegalStateException isx) {
                 Log.e(TAG, "Illegal state exception when trying to release output buffers");
             }
+        }
         }
         if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
     }
@@ -524,7 +539,7 @@ class BufferTranscoder extends Encoder {
                             Log.e(TAG, "Not supported colour format");
                         }
                         int retValue = JNIDownScaler(inpByteBuffArr, downscaleByteBuffArr, inpBitstreamFrWidth, inpBitstreamFrHeight, inpPlaneStride, decPixelfmt,
-                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt);
+                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt, downscaleFilterName);
                         if(retValue !=0) {
                             Log.d(TAG, "JNI retValue : " + retValue);
                         }
@@ -648,6 +663,7 @@ class BufferTranscoder extends Encoder {
                     break;
             }
             mStats.stop();
+            Log.d(TAG, "Submitted frames to enc: " + framesSubmitedToEnc + " extracted frames from enc " + framesWritten);
             try {
                 if (mCodec != null) {
                     mCodec.flush();
