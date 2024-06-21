@@ -638,8 +638,8 @@ class BufferX264Encoder extends Encoder {
         }
     }
 
-    public static native boolean x264Init(X264ConfigParams x264ConfigParamsInstance, X264Params x264ParamsInstance, X264Params.crop_rect cropRectInstance, X264Nal x264NalInstance,  X264Params.analyse analyseInstance, X264Params.vui vuiInstance, X264Params.rc rcInstance);
-    public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer, byte[] outputBuffer, int width, int height, byte[][] headerArray);
+    public static native int x264Init(X264ConfigParams x264ConfigParamsInstance, X264Params x264ParamsInstance, X264Params.crop_rect cropRectInstance, X264Nal x264NalInstance,  X264Params.analyse analyseInstance, X264Params.vui vuiInstance, X264Params.rc rcInstance, byte[][] headerArray);
+    public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer, byte[] outputBuffer, int width, int height);
     public static native void x264Close();
 
     public BufferX264Encoder(Test test) {
@@ -1003,7 +1003,7 @@ class BufferX264Encoder extends Encoder {
         }
         mStats.start();
 
-        String outputStreamName = "x264_output.mp4";
+        String outputStreamName = "x264_output.h264";
         File file = new File(Environment.getExternalStorageDirectory(), outputStreamName);
 
         // Ensure the parent directory exists
@@ -1015,9 +1015,6 @@ class BufferX264Encoder extends Encoder {
         try {
             FileOutputStream fileOutputStream = new FileOutputStream(file);
 
-            x264Init(x264ConfigParamsInstance, x264ParamsInstance, cropRectInstance, x264NalInstance,
-                    analyseInstance, vuiInstance, rcInstance);
-
             int currentFramePosition = 0;
             boolean input_done = false;
             boolean output_done = false;
@@ -1028,6 +1025,11 @@ class BufferX264Encoder extends Encoder {
             byte[] outputBuffer = new byte[frameSize];
             byte[][] headerArray = new byte[2][];
             int outputBufferSize;
+
+            //int sizeOfHeader = 50;
+            int sizeOfHeader = x264Init(x264ConfigParamsInstance, x264ParamsInstance, cropRectInstance, x264NalInstance,
+                    analyseInstance, vuiInstance, rcInstance, headerArray);
+            boolean flagHeaderSize = true;
 
             muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
 
@@ -1052,7 +1054,8 @@ class BufferX264Encoder extends Encoder {
 
                         byte[][] planes = extractYUVPlanes(yuvData, i_width, i_height);
 
-                        outputBufferSize = x264Encode(planes[0], planes[1], planes[2], outputBuffer, i_width, i_height, headerArray);
+                        outputBufferSize = x264Encode(planes[0], planes[1], planes[2], outputBuffer, i_width, i_height);
+                        //outputBufferSize = 4321;
                         if (outputBufferSize == 0) {
                             return "Failed to encode frame";
                         }
@@ -1061,7 +1064,7 @@ class BufferX264Encoder extends Encoder {
 
                         mFramesAdded++;
                         currentFramePosition += frameSize;
-                        fileOutputStream.write(outputBuffer, 0, outputBufferSize);
+                        //fileOutputStream.write(outputBuffer, 0, outputBufferSize);
                         Log.d(TAG, "Successfully written to " + outputStreamName);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -1091,14 +1094,14 @@ class BufferX264Encoder extends Encoder {
 //                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
 //                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 //                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
-
+/*
                         if (headerArray[0] != null && headerArray[1] != null) {
                             ByteBuffer sps = ByteBuffer.wrap(headerArray[0]);
                             ByteBuffer pps = ByteBuffer.wrap(headerArray[1]);
                             format.setByteBuffer("csd-0", sps);
                             format.setByteBuffer("csd-1", pps);
                         }
-
+*/
                         videoTrackIndex = muxer.addTrack(format);
                         muxer.start();
                         muxerStarted = true;
@@ -1107,17 +1110,25 @@ class BufferX264Encoder extends Encoder {
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
                     bufferInfo.offset = 0;
-                    bufferInfo.size = outputBufferSize;
+                    bufferInfo.size = flagHeaderSize ? outputBufferSize /* + sizeOfHeader */ : outputBufferSize;
+
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
                     //boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     //if (isKeyFrame) {
                         bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
                     //}
+                    //else
+                    //    bufferInfo.flags = 0;
                     //FrameInfo frameInfo = mStats.stopEncodingFrame(bufferInfo.presentationTimeUs, bufferInfo.size,
                     //        (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
 
-                    muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                    if(muxer != null && flagHeaderSize) {
+                        muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                        //fileOutputStream.write(buffer.array(), 0, outputBufferSize);
+                    }
+                    fileOutputStream.write(buffer.array(), 0, outputBufferSize);
+                    flagHeaderSize = false;
                 } catch (MediaCodec.CodecException ex) {
                     Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
                     ex.printStackTrace();

@@ -16,6 +16,9 @@ captures/
 *.apk
 output.json
 
+#Testing files
+testing_*/
+
 # IntelliJ
 *.iml
 .idea/
