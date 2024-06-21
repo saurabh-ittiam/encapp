@@ -31,7 +31,7 @@ X264Encoder::~X264Encoder() {
 
 int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
                        jobject x264ParamsObj, jobject x264CropRectObj, jobject x264NalObj, jobject x264AnalyseObj,
-                       jobject x264VuiObj, jobject x264RcObj, jobjectArray headerArray)
+                       jobject x264VuiObj, jobject x264RcObj, jbyteArray headerArray)
 {
     assert(x264encoder == NULL);
     x264encoder = new X264Encoder();
@@ -565,18 +565,33 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     x264_nal_t *nal = x264encoder->nal;
     int nnal = x264encoder->nnal;
     // Fill headerArray with SPS and PPS if not already set
-/*
+
+    int offset = 0;
     if (headerArray != nullptr) {
+        jsize headerArraySize = env->GetArrayLength(headerArray);
+        jbyte* headerArrayBuffer = env->GetByteArrayElements(headerArray, NULL);
+
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS || nal[i].i_type == NAL_SEI ||
                     nal[i].i_type == NAL_AUD || nal[i].i_type == NAL_FILLER) {
-                jbyteArray header = env->NewByteArray(nal[i].i_payload);
-                env->SetByteArrayRegion(header, 0, nal[i].i_payload, reinterpret_cast<jbyte*>(nal[i].p_payload));
-                env->SetObjectArrayElement(headerArray, i, header);
+                //jbyteArray header = env->NewByteArray(nal[i].i_payload);
+                //env->SetByteArrayRegion(header, 0, nal[i].i_payload, reinterpret_cast<jbyte*>(nal[i].p_payload));
+                //env->SetObjectArrayElement(headerArrayBuffer, i, header);
+
+                // Check if there is enough space in the header array
+                if (offset + nal[i].i_payload > headerArraySize) {
+                    // Handle the error, e.g., by returning an error code
+                    env->ReleaseByteArrayElements(headerArray, headerArrayBuffer, 0);
+                    return -1;
+                }
+
+                // Copy the payload into the header array
+                memcpy(headerArrayBuffer + offset, nal[i].p_payload, nal[i].i_payload);
+                offset += nal[i].i_payload;
             }
         }
+        env->ReleaseByteArrayElements(headerArray, headerArrayBuffer, 0);
     }
-*/
 
     LOGI("Passed x264_encoder_headers. Size size_of_headers=%d", size_of_headers);
     extra_data = p = (uint8_t *)malloc(size_of_headers + 64);
@@ -695,7 +710,7 @@ JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEn
                                                                                jobject x264ConfigParamsObj, jobject x264ParamsObj, 
                                                                                jobject x264CropRectObj, jobject x264NalObj, 
                                                                                jobject x264AnalyseObj, jobject x264VuiObj, 
-                                                                               jobject x264RcObj, jobjectArray headerArray) {
+                                                                               jobject x264RcObj, jbyteArray headerArray) {
     return X264Encoder::init(env, thisObj, x264ConfigParamsObj, x264ParamsObj, x264CropRectObj,
                                            x264NalObj, x264AnalyseObj, x264VuiObj, x264RcObj, headerArray);
 }

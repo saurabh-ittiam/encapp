@@ -10,7 +10,7 @@ public:
     static X264Encoder& getInstance();
 
     static int init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj, jobject x264ParamsObj, jobject x264CropRectObj,
-              jobject x264NalObj, jobject x264AnalyseObj, jobject x264VuiObj, jobject x264RcObj, jobjectArray headerArray);
+              jobject x264NalObj, jobject x264AnalyseObj, jobject x264VuiObj, jobject x264RcObj, jbyteArray headerArray);
 
     int encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
                jbyteArray outBuffer, jint width, jint height);
@@ -42,7 +42,7 @@ extern "C" {
                                                                            jobject x264ConfigParamsObj, jobject x264ParamsObj,
                                                                            jobject x264CropRectObj, jobject x264NalObj,
                                                                            jobject x264AnalyseObj, jobject x264VuiObj,
-                                                                           jobject x264RcObj, jobjectArray headerArray);
+                                                                           jobject x264RcObj, jbyteArray headerArray);
 
     JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer,
                                                                          jbyteArray uBuffer, jbyteArray vBuffer,

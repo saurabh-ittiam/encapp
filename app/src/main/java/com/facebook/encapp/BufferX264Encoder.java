@@ -638,7 +638,7 @@ class BufferX264Encoder extends Encoder {
         }
     }
 
-    public static native int x264Init(X264ConfigParams x264ConfigParamsInstance, X264Params x264ParamsInstance, X264Params.crop_rect cropRectInstance, X264Nal x264NalInstance,  X264Params.analyse analyseInstance, X264Params.vui vuiInstance, X264Params.rc rcInstance, byte[][] headerArray);
+    public static native int x264Init(X264ConfigParams x264ConfigParamsInstance, X264Params x264ParamsInstance, X264Params.crop_rect cropRectInstance, X264Nal x264NalInstance,  X264Params.analyse analyseInstance, X264Params.vui vuiInstance, X264Params.rc rcInstance, byte[] headerArray);
     public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer, byte[] outputBuffer, int width, int height);
     public static native void x264Close();
 
@@ -720,6 +720,14 @@ class BufferX264Encoder extends Encoder {
         int nalUnitType = nalUnitHeader & 0x1F;
 
         return nalUnitType == NAL_UNIT_TYPE_IDR;
+    }
+
+    public byte[] concatenateBuffers(byte[] headerArray, byte[] outputBuffer) {
+        byte[] concatenatedArray = new byte[headerArray.length + outputBuffer.length];
+        ByteBuffer concatenatedBuffer = ByteBuffer.wrap(concatenatedArray);
+        concatenatedBuffer.put(headerArray);
+        concatenatedBuffer.put(outputBuffer);
+        return concatenatedArray;
     }
 
     public String start() {
@@ -1023,7 +1031,9 @@ class BufferX264Encoder extends Encoder {
             boolean muxerStarted = false;
             int frameSize = i_width * i_height * 3 / 2;
             byte[] outputBuffer = new byte[frameSize];
-            byte[][] headerArray = new byte[2][];
+            //byte[][] headerArray = new byte[2][];
+            int estimatedSize = 2048; // Adjust this size as needed
+            byte[] headerArray = new byte[estimatedSize];
             int outputBufferSize;
 
             //int sizeOfHeader = 50;
@@ -1107,10 +1117,12 @@ class BufferX264Encoder extends Encoder {
                         muxerStarted = true;
                     }
 
+                    //byte[] concatenatedResult = concatenateBuffers(headerArray, outputBuffer);
+                    //ByteBuffer buffer = ByteBuffer.wrap(concatenatedResult);
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
                     bufferInfo.offset = 0;
-                    bufferInfo.size = flagHeaderSize ? outputBufferSize /* + sizeOfHeader */ : outputBufferSize;
+                    bufferInfo.size = flagHeaderSize ? (outputBufferSize + sizeOfHeader) : outputBufferSize;
 
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
