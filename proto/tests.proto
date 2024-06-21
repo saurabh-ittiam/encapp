@@ -103,6 +103,7 @@ message Configure {
     mainStill = 4;
   }
   optional HEVCProfile hevc_profile = 25;
+  optional string downscale_filter = 26 [default = "lanczos"];
 }
 
 message Runtime {
