@@ -578,6 +578,15 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
                 //env->SetByteArrayRegion(header, 0, nal[i].i_payload, reinterpret_cast<jbyte*>(nal[i].p_payload));
                 //env->SetObjectArrayElement(headerArrayBuffer, i, header);
 
+                if (nal[i].i_type == NAL_SEI)
+                {
+                    LOGI("In SEI");
+                    sei_size = nal[i].i_payload;
+                    LOGI("sei_size: %d", sei_size);
+                    sei      = (uint8_t *)malloc(sei_size);
+                    memcpy(sei, nal[i].p_payload, nal[i].i_payload);
+                }
+
                 // Check if there is enough space in the header array
                 if (offset + nal[i].i_payload > headerArraySize) {
                     // Handle the error, e.g., by returning an error code
@@ -593,6 +602,7 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
         env->ReleaseByteArrayElements(headerArray, headerArrayBuffer, 0);
     }
 
+    /*
     LOGI("Passed x264_encoder_headers. Size size_of_headers=%d", size_of_headers);
     extra_data = p = (uint8_t *)malloc(size_of_headers + 64);
 
@@ -610,7 +620,7 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
         p += nal[i].i_payload;
     }
     extra_data_size = p - extra_data;
-
+*/
     env->ReleaseStringUTFChars(presetValueObj, presetValue);
     env->ReleaseStringUTFChars(tuneValueObj, tuneValue);
     env->ReleaseStringUTFChars(profileValueObj, profileValue);
@@ -672,7 +682,7 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
     if (frame_size >= 0) {
-        int total_size = 0;
+        int total_size = 2;
         for (int i = 0; i < nnal; i++) {
             total_size += nal[i].i_payload;
         }
@@ -684,7 +694,9 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
 
         jbyte *out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
 
-        int offset = 0;
+        int offset = 2;
+        out_buffer_data[0] = 0;
+        out_buffer_data[1] = 0;
         for (int i = 0; i < nnal; i++) {
             memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
             offset += nal[i].i_payload;

@@ -1,12 +1,9 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
-
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
-import android.os.Build;
 import android.os.Environment;
 import android.util.Log;
 import android.util.Size;
@@ -15,7 +12,6 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
-import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
@@ -26,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 /**
  * Created by jobl on 2018-02-27.
@@ -772,8 +769,8 @@ class BufferX264Encoder extends Encoder {
         int b_deterministic = 0;
         int b_cpu_independent = 0;
         int i_sync_lookahead = -1;
-        int i_width = 640;
-        int i_height = 360;
+        int i_width = 1920;
+        int i_height = 1080;
         int i_csp = 2;
         int i_bitdepth = 8;
         int i_level_idc = 9;
@@ -1012,7 +1009,9 @@ class BufferX264Encoder extends Encoder {
         mStats.start();
 
         String outputStreamName = "x264_output.h264";
+        String headerDump = "x264_header_dump.h264";
         File file = new File(Environment.getExternalStorageDirectory(), outputStreamName);
+        File file2 = new File(Environment.getExternalStorageDirectory(), headerDump);
 
         // Ensure the parent directory exists
         File parentDir = file.getParentFile();
@@ -1022,11 +1021,14 @@ class BufferX264Encoder extends Encoder {
 
         try {
             FileOutputStream fileOutputStream = new FileOutputStream(file);
+            FileOutputStream fileOutputStream2 = new FileOutputStream(file2);
 
             int currentFramePosition = 0;
             boolean input_done = false;
             boolean output_done = false;
             MediaMuxer muxer = null;
+            MediaCodec.BufferInfo bufferInfo = null;
+
             int videoTrackIndex = -1;
             boolean muxerStarted = false;
             int frameSize = i_width * i_height * 3 / 2;
@@ -1041,7 +1043,6 @@ class BufferX264Encoder extends Encoder {
                     analyseInstance, vuiInstance, rcInstance, headerArray);
             boolean flagHeaderSize = true;
 
-            muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
 
             while (!input_done || !output_done) {
                 try {
@@ -1100,18 +1101,54 @@ class BufferX264Encoder extends Encoder {
                         format.setInteger(MediaFormat.KEY_HEIGHT, i_height);
 //                            format.setInteger(MediaFormat.KEY_M , 800000);
                         format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
-                        format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-//                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-//                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+                        format.setInteger(MediaFormat.KEY_FRAME_RATE, 50);
+                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 //                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
-/*
-                        if (headerArray[0] != null && headerArray[1] != null) {
-                            ByteBuffer sps = ByteBuffer.wrap(headerArray[0]);
-                            ByteBuffer pps = ByteBuffer.wrap(headerArray[1]);
+
+
+                        int spsStart = -1;
+                        int spsEnd = -1;
+                        int ppsStart = -1;
+                        int ppsEnd = -1;
+
+                        for (int i = 0; i < headerArray.length - 4; i++) {
+                            // Check for the start code 0x00000001 or 0x000001
+                            if ((headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x00 && headerArray[i+3] == 0x01) ||
+                                    (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
+
+                                int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
+                                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
+                                    spsStart = i;
+                                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
+                                    spsEnd = i;
+                                    ppsStart = i;
+                                }
+                                else if(spsEnd != -1 && ppsStart != -1) {
+                                    if(headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01 && headerArray[i-1] != 0x00) {
+                                        ppsEnd = i;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        byte[] spsBuffer = Arrays.copyOfRange(headerArray, spsStart, spsEnd);
+                        byte[] ppsBuffer = Arrays.copyOfRange(headerArray, ppsStart, ppsEnd);
+
+                        // Wrap them in ByteBuffers
+                        //ByteBuffer spsBuffer = ByteBuffer.wrap(sps);
+                        //ByteBuffer ppsBuffer = ByteBuffer.wrap(pps);
+                        //if (headerArray[0] != null && headerArray[1] != null) {
+                            ByteBuffer sps = ByteBuffer.wrap(spsBuffer);
+                            ByteBuffer pps = ByteBuffer.wrap(ppsBuffer);
                             format.setByteBuffer("csd-0", sps);
                             format.setByteBuffer("csd-1", pps);
-                        }
-*/
+                        //}
+
+                        bufferInfo = new MediaCodec.BufferInfo();
+                        muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+                        //bufferInfo.set(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
                         videoTrackIndex = muxer.addTrack(format);
                         muxer.start();
                         muxerStarted = true;
@@ -1120,9 +1157,8 @@ class BufferX264Encoder extends Encoder {
                     //byte[] concatenatedResult = concatenateBuffers(headerArray, outputBuffer);
                     //ByteBuffer buffer = ByteBuffer.wrap(concatenatedResult);
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
-                    MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
                     bufferInfo.offset = 0;
-                    bufferInfo.size = flagHeaderSize ? (outputBufferSize + sizeOfHeader) : outputBufferSize;
+                    bufferInfo.size = flagHeaderSize ? (outputBufferSize /*+ sizeOfHeader*/) : outputBufferSize;
 
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
@@ -1136,10 +1172,13 @@ class BufferX264Encoder extends Encoder {
                     //        (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
 
                     if(muxer != null && flagHeaderSize) {
+                        buffer.position(bufferInfo.offset);
+                        buffer.limit(bufferInfo.offset + bufferInfo.size);
+
                         muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
-                        //fileOutputStream.write(buffer.array(), 0, outputBufferSize);
+                        fileOutputStream2.write(headerArray, 0, sizeOfHeader);
+                        fileOutputStream.write(buffer.array(), 0, outputBufferSize);
                     }
-                    fileOutputStream.write(buffer.array(), 0, outputBufferSize);
                     flagHeaderSize = false;
                 } catch (MediaCodec.CodecException ex) {
                     Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
