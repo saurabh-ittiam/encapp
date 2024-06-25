@@ -551,6 +551,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         mStats.startDecodingFrame(ptsUsec, size, flags);
                         try {
                             mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
+                            Log.d(TAG, "submitted frame to dec : " + mInFramesCount);
                         } catch (IllegalStateException ise) {
                             // Ignore this
                         }

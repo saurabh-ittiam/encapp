@@ -372,7 +372,7 @@ class BufferTranscoder extends Encoder {
 
     void bufferTranscoding(int trackIndex) throws IOException {
         if (mDecodeDump) {
-            String outputYUVName = mStats.getId() + ".yuv";
+            String outputYUVName = getOutputFilename() + ".yuv";
             Log.d(TAG, "YUV Filename: "+ outputYUVName);
             file = new File(Environment.getExternalStorageDirectory() + "/" + File.separator + outputYUVName);
             file.delete();

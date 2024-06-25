@@ -229,9 +229,9 @@ public abstract class Encoder {
 //            }
             String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s_%s",
                     Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
-                    mTest.getConfigure().getCodec().toString().startsWith("c2.android.avc.encoder") || mTest.getConfigure().getCodec().toString().startsWith("OMX.google.h264.encoder") ? "sw" : codec_type,
-                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
-                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+                    mTest.getConfigure().getCodec().toString().startsWith("c2.android") || mTest.getConfigure().getCodec().toString().startsWith("OMX.google.h264.encoder") ? "sw" : codec_type,
+                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString().toLowerCase() :
+                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString().toLowerCase() : "NA"),
                     mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
                     1,
                     mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
