@@ -1171,7 +1171,7 @@ class BufferX264Encoder extends Encoder {
                     //FrameInfo frameInfo = mStats.stopEncodingFrame(bufferInfo.presentationTimeUs, bufferInfo.size,
                     //        (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
 
-                    if(muxer != null && flagHeaderSize) {
+                    if(muxer != null) {
                         buffer.position(bufferInfo.offset);
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 

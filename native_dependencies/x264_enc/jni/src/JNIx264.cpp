@@ -698,6 +698,10 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
         out_buffer_data[0] = 0;
         out_buffer_data[1] = 0;
         for (int i = 0; i < nnal; i++) {
+            if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS || nal[i].i_type == NAL_SEI ||
+            nal[i].i_type == NAL_AUD || nal[i].i_type == NAL_FILLER) {
+                continue;
+            }
             memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
             offset += nal[i].i_payload;
         }
