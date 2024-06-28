@@ -12,7 +12,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 
 # Set the name of the shared library
 LOCAL_MODULE := x264_jni
-LOCAL_CFLAGS := -g -O3 -fexceptions
+LOCAL_CFLAGS := -g -O3 -fexceptions -fPIC
 
 # List JNI wrapper source files
 LOCAL_SRC_FILES += JNIx264.cpp
@@ -24,6 +24,6 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)
 LOCAL_STATIC_LIBRARIES += libx264
 
 LOCAL_LDLIBS += \
-    -ldl -llog -landroid
+    -ldl -llog -landroid -lz -lm
 
 include $(BUILD_SHARED_LIBRARY)

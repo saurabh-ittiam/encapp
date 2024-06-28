@@ -559,12 +559,16 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
 
     x264_encoder_parameters(encoder, &x264Params);
 
+    LOGI("Before x264_encoder_headers: %d", &(x264encoder->nnal));
+
     size_of_headers = x264_encoder_headers(encoder, &(x264encoder->nal), &(x264encoder->nnal));
     LOGI("size_of_headers: %d", size_of_headers);
 
     x264_nal_t *nal = x264encoder->nal;
     int nnal = x264encoder->nnal;
     // Fill headerArray with SPS and PPS if not already set
+    LOGI("After x264_encoder_headers: %d", &(x264encoder->nnal));
+
 
     int offset = 0;
     if (headerArray != nullptr) {
@@ -679,7 +683,10 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     pic_in.img.i_stride[1] = width / 2;
     pic_in.img.i_stride[2] = width / 2;
 
+    LOGI("Before x264_encoder_encode: %d", nnal);
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
+    LOGI("After x264_encoder_encode: %d", nnal);
+
 
     if (frame_size >= 0) {
         int total_size = 2;

@@ -676,7 +676,7 @@ class BufferX264Encoder extends Encoder {
 
         return new byte[][]{yPlane, uPlane, vPlane};
     }
-
+/*
     private int findStartCodePrefix(byte[] frame) {
         // Look for the start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
         for (int i = 0; i < frame.length - 4; i++) {
@@ -717,6 +717,24 @@ class BufferX264Encoder extends Encoder {
         int nalUnitType = nalUnitHeader & 0x1F;
 
         return nalUnitType == NAL_UNIT_TYPE_IDR;
+    }
+*/
+    public boolean checkIfKeyFrame(byte[] bitstream) {
+        int nalUnitType;
+        for (int i = 0; i < bitstream.length - 4; i++) {
+            // Check for the start code 0x00000001 or 0x000001
+            if ((bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x00 && bitstream[i+3] == 0x01) ||
+                    (bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x01)) {
+
+                nalUnitType = bitstream[i + (bitstream[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
+
+                // Check if the NAL unit type is 5 (IDR frame)
+                if (nalUnitType == 5) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public byte[] concatenateBuffers(byte[] headerArray, byte[] outputBuffer) {
@@ -794,7 +812,7 @@ class BufferX264Encoder extends Encoder {
         int i_colmatrix = -1;
         int i_chroma_loc = 0;
 
-        int i_frame_reference = 1;
+        int i_frame_reference = 10;
         int i_dpb_size = 1;
         int i_keyint_max = 250;
         int i_keyint_min = 0;
@@ -1103,7 +1121,7 @@ class BufferX264Encoder extends Encoder {
                         format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
                         format.setInteger(MediaFormat.KEY_FRAME_RATE, 50);
                             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 10);
 //                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
 
 
@@ -1158,11 +1176,10 @@ class BufferX264Encoder extends Encoder {
                     //ByteBuffer buffer = ByteBuffer.wrap(concatenatedResult);
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     bufferInfo.offset = 0;
-                    bufferInfo.size = flagHeaderSize ? (outputBufferSize /*+ sizeOfHeader*/) : outputBufferSize;
-
+                    bufferInfo.size = outputBufferSize;
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
-                    //boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
                     //if (isKeyFrame) {
                         bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
                     //}
@@ -1176,7 +1193,8 @@ class BufferX264Encoder extends Encoder {
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 
                         muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
-                        fileOutputStream2.write(headerArray, 0, sizeOfHeader);
+                        if(flagHeaderSize)
+                            fileOutputStream2.write(headerArray, 0, sizeOfHeader);
                         fileOutputStream.write(buffer.array(), 0, outputBufferSize);
                     }
                     flagHeaderSize = false;
