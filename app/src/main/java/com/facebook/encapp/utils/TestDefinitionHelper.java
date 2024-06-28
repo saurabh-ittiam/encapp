@@ -88,13 +88,15 @@ public class TestDefinitionHelper {
         for (MediaCodecInfo codecInfo : codecs) {
             if (codecInfo.getName().equals(config.getCodec())) {
                 MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(config.getMime());
-                int bitrateMode = 0;
-                if (config.hasBitrateMode() && (capabilities.getEncoderCapabilities().isBitrateModeSupported(config.getBitrateMode().getNumber()))) {
-                    bitrateMode = config.getBitrateMode().getNumber();
-                    mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
-                } else {
-                    Log.e(TAG, "Bitrate mode " + config.getBitrateMode() + " not supported");
-                    throw new Exception(String.valueOf(config.getBitrateMode()));
+                int bitrateMode = -1;
+                if (config.hasBitrateMode()){
+                    if (capabilities.getEncoderCapabilities().isBitrateModeSupported(config.getBitrateMode().getNumber())){
+                        bitrateMode = config.getBitrateMode().getNumber();
+                        mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, bitrateMode);
+                    } else {
+                        Log.e(TAG, "Bitrate mode " + config.getBitrateMode() + " not supported");
+                        throw new Exception(String.valueOf(config.getBitrateMode()));
+                    }
                 }
 
                 if (config.hasAvcProfile() || config.hasHevcProfile()) {
