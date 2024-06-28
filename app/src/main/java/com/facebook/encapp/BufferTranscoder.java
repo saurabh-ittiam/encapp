@@ -68,8 +68,7 @@ class BufferTranscoder extends Encoder {
     MediaFormat currentEncOutputFormat = null;
     Dictionary<String, Object> latestFrameChanges = null;
 
-    /*For indicating too many consecutive failures while submitting decoded
-    frame to encoder*/
+    /*For indicating too many consecutive failures while getting mediacodec resources*/
     int failures = 0;
     int inpBitstreamFrWidth = 0;
     int inpBitstreamFrHeight = 0;
@@ -582,13 +581,24 @@ class BufferTranscoder extends Encoder {
         while (index != MediaCodec.INFO_TRY_AGAIN_LATER) {
             long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
             index = mCodec.dequeueOutputBuffer(info, timeoutUs);
+            Log.d(TAG, "index:: " + index + " file written to mp4 file: " + framesWritten);
             if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 // check if the input is already done
                 if (encInpSubmitDone && (framesSubmitedToEnc==framesWritten)) {
                     encOutputExtractDone = true;
                     Log.d(TAG, "encOutputExtractDone is set to true in 'MediaCodec.INFO_TRY_AGAIN_LATER' ");
                 }
-                // otherwise ignore
+                Log.d(TAG, "waiting dequeueOutputBuffer index: " + index);
+                //After extracting all frames from decoder and submitted to encoder, encoder failed to produce
+                //output to output buffers, we count it as failure (starving for o/p buffers), if failures happen consecutively for several times,
+                //force the application to close.
+                if(decOutputExtractDone){
+                    failures ++;
+                }
+                if(failures > 20) {
+                    encOutputExtractDone = true;
+                    Log.e(TAG, "consecutively failed to get encoder dequeueOutputBuffer");
+                }
             }
             if(index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                 if (Build.VERSION.SDK_INT >= 29) {
