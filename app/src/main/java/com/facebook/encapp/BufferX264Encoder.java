@@ -676,49 +676,40 @@ class BufferX264Encoder extends Encoder {
 
         return new byte[][]{yPlane, uPlane, vPlane};
     }
-/*
-    private int findStartCodePrefix(byte[] frame) {
-        // Look for the start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
-        for (int i = 0; i < frame.length - 4; i++) {
-            if (frame[i] == 0x00 && frame[i + 1] == 0x00 && frame[i + 2] == 0x01) {
-                return i;
-            }
-            if (frame[i] == 0x00 && frame[i + 1] == 0x00 && frame[i + 2] == 0x00 && frame[i + 3] == 0x01) {
-                return i;
+
+    public static byte[][] extractSpsPps(byte[] headerArray) {
+        int spsStart = -1;
+        int spsEnd = -1;
+        int ppsStart = -1;
+        int ppsEnd = -1;
+
+        for (int i = 0; i < headerArray.length - 4; i++) {
+            // Check for the start code 0x00000001 or 0x000001
+            if ((headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x00 && headerArray[i+3] == 0x01) ||
+                    (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
+
+                int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
+                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
+                    spsStart = i;
+                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
+                    spsEnd = i;
+                    ppsStart = i;
+                }
+                else if(spsEnd != -1 && ppsStart != -1) {
+                    if(headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01 && headerArray[i-1] != 0x00) {
+                        ppsEnd = i;
+                        break;
+                    }
+                }
             }
         }
-        return -1;
+
+        byte[] spsBuffer = Arrays.copyOfRange(headerArray, spsStart, spsEnd);
+        byte[] ppsBuffer = Arrays.copyOfRange(headerArray, ppsStart, ppsEnd);
+
+        return new byte[][]{spsBuffer, ppsBuffer};
     }
-    private boolean checkIfKeyFrame(byte[] frame) {
-        // H.264 NAL unit type for IDR frames (key frames) is 5
-        final byte NAL_UNIT_TYPE_IDR = 5;
 
-        // H.264 frames start with a start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
-        // followed by the NAL unit header.
-
-        // NAL unit header format (first byte after the start code prefix):
-        // +---------------+
-        // |0|1|2|3|4|5|6|7|
-        // +-+-+-+-+-+-+-+-+
-        // |F|NRI|  Type   |
-        // +---------------+
-        // F: forbidden_zero_bit (1 bit) - must be 0
-        // NRI: nal_ref_idc (2 bits) - nal reference indicator
-        // Type: nal_unit_type (5 bits)
-
-        // Find the start code prefix (0x00 0x00 0x01 or 0x00 0x00 0x00 0x01)
-        int startIndex = findStartCodePrefix(frame);
-        if (startIndex == -1 || startIndex + 4 >= frame.length) {
-            return false; // Invalid frame or no start code prefix found
-        }
-
-        // The NAL unit type is in the lower 5 bits of the byte following the start code prefix
-        byte nalUnitHeader = frame[startIndex + 4];
-        int nalUnitType = nalUnitHeader & 0x1F;
-
-        return nalUnitType == NAL_UNIT_TYPE_IDR;
-    }
-*/
     public boolean checkIfKeyFrame(byte[] bitstream) {
         int nalUnitType;
         for (int i = 0; i < bitstream.length - 4; i++) {
@@ -812,7 +803,7 @@ class BufferX264Encoder extends Encoder {
         int i_colmatrix = -1;
         int i_chroma_loc = 0;
 
-        int i_frame_reference = 10;
+        int i_frame_reference = 1;
         int i_dpb_size = 1;
         int i_keyint_max = 250;
         int i_keyint_min = 0;
@@ -1051,16 +1042,13 @@ class BufferX264Encoder extends Encoder {
             boolean muxerStarted = false;
             int frameSize = i_width * i_height * 3 / 2;
             byte[] outputBuffer = new byte[frameSize];
-            //byte[][] headerArray = new byte[2][];
             int estimatedSize = 2048; // Adjust this size as needed
             byte[] headerArray = new byte[estimatedSize];
             int outputBufferSize;
 
-            //int sizeOfHeader = 50;
             int sizeOfHeader = x264Init(x264ConfigParamsInstance, x264ParamsInstance, cropRectInstance, x264NalInstance,
                     analyseInstance, vuiInstance, rcInstance, headerArray);
             boolean flagHeaderSize = true;
-
 
             while (!input_done || !output_done) {
                 try {
@@ -1084,16 +1072,11 @@ class BufferX264Encoder extends Encoder {
                         byte[][] planes = extractYUVPlanes(yuvData, i_width, i_height);
 
                         outputBufferSize = x264Encode(planes[0], planes[1], planes[2], outputBuffer, i_width, i_height);
-                        //outputBufferSize = 4321;
                         if (outputBufferSize == 0) {
                             return "Failed to encode frame";
                         }
-
-                        //int callMuxer = muxFrame(outputBuffer, i_width, i_height, headerArray);
-
                         mFramesAdded++;
                         currentFramePosition += frameSize;
-                        //fileOutputStream.write(outputBuffer, 0, outputBufferSize);
                         Log.d(TAG, "Successfully written to " + outputStreamName);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -1108,85 +1091,34 @@ class BufferX264Encoder extends Encoder {
                 try {
                     if (!muxerStarted) {
                         MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, i_width, i_height);
-//                            format.setInteger(MediaFormat.KEY_WIDTH, i_width);
-//                            format.setInteger(MediaFormat.KEY_HEIGHT, i_height);
-//                            format.setInteger(MediaFormat.KEY_BIT_RATE, 125000);
-//                            format.setInteger(MediaFormat.KEY_FRAME_RATE, 30);
-//                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-//                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, -1);
-//                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, 0);
                         format.setInteger(MediaFormat.KEY_WIDTH, i_width);
                         format.setInteger(MediaFormat.KEY_HEIGHT, i_height);
-//                            format.setInteger(MediaFormat.KEY_M , 800000);
                         format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
                         format.setInteger(MediaFormat.KEY_FRAME_RATE, 50);
-                            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-                            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 10);
-//                            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
+                        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 
+                        byte[][] spsPps = extractSpsPps(headerArray);
 
-                        int spsStart = -1;
-                        int spsEnd = -1;
-                        int ppsStart = -1;
-                        int ppsEnd = -1;
-
-                        for (int i = 0; i < headerArray.length - 4; i++) {
-                            // Check for the start code 0x00000001 or 0x000001
-                            if ((headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x00 && headerArray[i+3] == 0x01) ||
-                                    (headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01)) {
-
-                                int nalType = headerArray[i + (headerArray[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-                                if (nalType == 7 && spsStart == -1) { // SPS NAL unit type is 7
-                                    spsStart = i;
-                                } else if (nalType == 8 && spsStart != -1 && spsEnd == -1) { // PPS NAL unit type is 8
-                                    spsEnd = i;
-                                    ppsStart = i;
-                                }
-                                else if(spsEnd != -1 && ppsStart != -1) {
-                                    if(headerArray[i] == 0x00 && headerArray[i+1] == 0x00 && headerArray[i+2] == 0x01 && headerArray[i-1] != 0x00) {
-                                        ppsEnd = i;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        byte[] spsBuffer = Arrays.copyOfRange(headerArray, spsStart, spsEnd);
-                        byte[] ppsBuffer = Arrays.copyOfRange(headerArray, ppsStart, ppsEnd);
-
-                        // Wrap them in ByteBuffers
-                        //ByteBuffer spsBuffer = ByteBuffer.wrap(sps);
-                        //ByteBuffer ppsBuffer = ByteBuffer.wrap(pps);
-                        //if (headerArray[0] != null && headerArray[1] != null) {
-                            ByteBuffer sps = ByteBuffer.wrap(spsBuffer);
-                            ByteBuffer pps = ByteBuffer.wrap(ppsBuffer);
-                            format.setByteBuffer("csd-0", sps);
-                            format.setByteBuffer("csd-1", pps);
-                        //}
+                        ByteBuffer sps = ByteBuffer.wrap(spsPps[0]);
+                        ByteBuffer pps = ByteBuffer.wrap(spsPps[1]);
+                        format.setByteBuffer("csd-0", sps);
+                        format.setByteBuffer("csd-1", pps);
 
                         bufferInfo = new MediaCodec.BufferInfo();
                         muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-                        //bufferInfo.set(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
                         videoTrackIndex = muxer.addTrack(format);
                         muxer.start();
                         muxerStarted = true;
                     }
 
-                    //byte[] concatenatedResult = concatenateBuffers(headerArray, outputBuffer);
-                    //ByteBuffer buffer = ByteBuffer.wrap(concatenatedResult);
                     ByteBuffer buffer = ByteBuffer.wrap(outputBuffer);
                     bufferInfo.offset = 0;
                     bufferInfo.size = outputBufferSize;
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
-                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
-                    //if (isKeyFrame) {
-                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
-                    //}
-                    //else
-                    //    bufferInfo.flags = 0;
-                    //FrameInfo frameInfo = mStats.stopEncodingFrame(bufferInfo.presentationTimeUs, bufferInfo.size,
-                    //        (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0);
+//                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
+                    bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
 
                     if(muxer != null) {
                         buffer.position(bufferInfo.offset);
