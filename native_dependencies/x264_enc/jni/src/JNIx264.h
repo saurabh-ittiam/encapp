@@ -9,11 +9,12 @@ class X264Encoder {
 public:
     static X264Encoder& getInstance();
 
-    static int init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj, jobject x264ParamsObj, jobject x264CropRectObj,
-              jobject x264NalObj, jobject x264AnalyseObj, jobject x264VuiObj, jobject x264RcObj, jbyteArray headerArray);
+    static int init(JNIEnv *env, jobject thisObj,
+                    jobject x264ConfigParamsObj, int width, int height,
+                    int colourSpace, int bitDepth, jbyteArray headerArray);
 
     int encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
-               jbyteArray outBuffer, jint width, jint height);
+               jbyteArray outBuffer, jint width, jint height, jint colourSpace);
 
     void close();
 
@@ -39,14 +40,12 @@ extern "C" {
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
     JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj,
-                                                                           jobject x264ConfigParamsObj, jobject x264ParamsObj,
-                                                                           jobject x264CropRectObj, jobject x264NalObj,
-                                                                           jobject x264AnalyseObj, jobject x264VuiObj,
-                                                                           jobject x264RcObj, jbyteArray headerArray);
+                                                                       jobject x264ConfigParamsObj, int width, int height,
+                                                                       int colourSpace, int bitDepth, jbyteArray headerArray);
 
     JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer,
                                                                          jbyteArray uBuffer, jbyteArray vBuffer,
-                                                                         jbyteArray outBuffer, jint width, jint height);
+                                                                         jbyteArray outBuffer, jint width, jint height, jint colourSpace);
 
     JNIEXPORT void Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj);
 

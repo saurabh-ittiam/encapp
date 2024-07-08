@@ -28,8 +28,7 @@ X264Encoder::~X264Encoder() {
 }
 
 int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
-                       jobject x264ParamsObj, jobject x264CropRectObj, jobject x264NalObj, jobject x264AnalyseObj,
-                       jobject x264VuiObj, jobject x264RcObj, jbyteArray headerArray)
+                       int width, int height, int colourSpace, int bitDepth, jbyteArray headerArray)
 {
     assert(x264encoder == NULL);
     x264encoder = new X264Encoder();
@@ -41,38 +40,22 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     }
 
     jclass x264ConfigParamsClass = env->GetObjectClass(x264ConfigParamsObj);
-    jclass x264ParamsClass = env->GetObjectClass(x264ParamsObj);
-    jclass x264CropRectClass = env->GetObjectClass(x264CropRectObj);
-    jclass x264NalClass = env->GetObjectClass(x264NalObj);
-    jclass x264AnalyseClass = env->GetObjectClass(x264AnalyseObj);
-    jclass x264VuiClass = env->GetObjectClass(x264VuiObj);
-    jclass x264RcClass = env->GetObjectClass(x264RcObj);
 
     jfieldID presetFieldID = env->GetFieldID(x264ConfigParamsClass, "preset", "Ljava/lang/String;");
-    jfieldID iThreadsFieldID = env->GetFieldID(x264ParamsClass, "i_threads", "I");
-    jfieldID iWidthFieldID = env->GetFieldID(x264ParamsClass, "i_width", "I");
-    jfieldID iHeightFieldID = env->GetFieldID(x264ParamsClass, "i_height", "I");
-    jfieldID iCspFieldID = env->GetFieldID(x264ParamsClass, "i_csp", "I");
-    jfieldID iBitdepthFieldID = env->GetFieldID(x264ParamsClass, "i_bitdepth", "I");
 
     jstring presetValueObj = (jstring)env->GetObjectField(x264ConfigParamsObj, presetFieldID);
     const char *presetValue = env->GetStringUTFChars(presetValueObj, NULL);
-    jint iThreadsValue = env->GetIntField(x264ParamsObj, iThreadsFieldID);
-    jint iWidthValue = env->GetIntField(x264ParamsObj, iWidthFieldID);
-    jint iHeightValue = env->GetIntField(x264ParamsObj, iHeightFieldID);
-    jint iCspValue = env->GetIntField(x264ParamsObj, iCspFieldID);
-    jint iBitdepthValue = env->GetIntField(x264ParamsObj, iBitdepthFieldID);
 
     if (x264_param_default_preset(&x264Params, presetValue, "zerolatency") < 0) {
         LOGI("Failed to set preset: %s", presetValue);
     }
 
     // Mapping to x264 structure members
-    x264Params.i_threads = iThreadsValue;
-    x264Params.i_width = iWidthValue;
-    x264Params.i_height = iHeightValue;
-    x264Params.i_csp = iCspValue;
-    x264Params.i_bitdepth = iBitdepthValue;
+    x264Params.i_threads = 1;
+    x264Params.i_width = width;
+    x264Params.i_height = height;
+    x264Params.i_csp = colourSpace;
+    x264Params.i_bitdepth = bitDepth;
 
     x264encoder->encoder = x264_encoder_open(&x264Params);
     x264_t *encoder = x264encoder->encoder;
@@ -113,7 +96,7 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
 }
 
 int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray uBuffer, jbyteArray vBuffer,
-                        jbyteArray out_buffer, jint width, jint height)
+                        jbyteArray out_buffer, jint width, jint height, jint colourSpace)
 {
     if (!encoder) {
         LOGI("Encoder is not initialized for encoding");
@@ -136,7 +119,7 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     jint uvSize = width * height / 4;
 
     x264_picture_init(&pic_in);
-    pic_in.img.i_csp = 2;
+    pic_in.img.i_csp = colourSpace;
     pic_in.img.i_plane = 3;
 
     pic_in.img.plane[0] = new uint8_t[ySize];
@@ -194,18 +177,15 @@ void X264Encoder::close()
 extern "C" {
 
 JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj,
-                                                                               jobject x264ConfigParamsObj, jobject x264ParamsObj, 
-                                                                               jobject x264CropRectObj, jobject x264NalObj, 
-                                                                               jobject x264AnalyseObj, jobject x264VuiObj, 
-                                                                               jobject x264RcObj, jbyteArray headerArray) {
-    return X264Encoder::init(env, thisObj, x264ConfigParamsObj, x264ParamsObj, x264CropRectObj,
-                                           x264NalObj, x264AnalyseObj, x264VuiObj, x264RcObj, headerArray);
+                                                                           jobject x264ConfigParamsObj, int width, int height,
+                                                                           int colourSpace, int bitDepth, jbyteArray headerArray) {
+    return X264Encoder::init(env, thisObj, x264ConfigParamsObj, width, height, colourSpace, bitDepth, headerArray);
 }
 
 JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yBuffer,
                                                                              jbyteArray uBuffer, jbyteArray vBuffer,
-                                                                             jbyteArray outBuffer, jint width, jint height) {
-    return X264Encoder::getInstance().encode(env, thisObj, yBuffer, uBuffer, vBuffer, outBuffer, width, height);
+                                                                             jbyteArray outBuffer, jint width, jint height, jint colourSpace) {
+    return X264Encoder::getInstance().encode(env, thisObj, yBuffer, uBuffer, vBuffer, outBuffer, width, height, colourSpace);
 }
 
 JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj) {
