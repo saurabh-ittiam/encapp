@@ -144,6 +144,12 @@ message Serial {
   repeated Test test = 1;
 }
 
+message EncoderX264 {
+  optional string preset = 1 [default = "medium"];
+  optional int32 colorSpace = 2 [default = 2];
+  optional int32 bitdepth = 3 [default = 8];
+}
+
 message Test {
   optional Common common = 1;
   optional Input input = 2;
@@ -152,6 +158,7 @@ message Test {
   optional DecoderConfigure decoder_configure = 5;
   optional DecoderRuntime decoder_runtime = 6;
   optional Parallel parallel = 7;
+  optional EncoderX264 encoderX264 = 8;
 }
 
 message TestSuite {

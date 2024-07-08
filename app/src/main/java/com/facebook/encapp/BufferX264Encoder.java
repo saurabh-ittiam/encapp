@@ -728,14 +728,6 @@ class BufferX264Encoder extends Encoder {
         return false;
     }
 
-    public byte[] concatenateBuffers(byte[] headerArray, byte[] outputBuffer) {
-        byte[] concatenatedArray = new byte[headerArray.length + outputBuffer.length];
-        ByteBuffer concatenatedBuffer = ByteBuffer.wrap(concatenatedArray);
-        concatenatedBuffer.put(headerArray);
-        concatenatedBuffer.put(outputBuffer);
-        return concatenatedArray;
-    }
-
     public String start() {
         Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
         try {
@@ -761,6 +753,11 @@ class BufferX264Encoder extends Encoder {
         mYuvReader = new FileReader();
         int playoutframes = mTest.getInput().getPlayoutFrames();
 
+        String preset = mTest.getEncoderX264().getPreset();
+        int i_width = sourceResolution.getWidth();
+        int i_height = sourceResolution.getHeight();
+        int i_csp = mTest.getEncoderX264().getColorSpace();
+        int i_bitdepth = mTest.getEncoderX264().getBitdepth();
 
         int i_ref_idc = 1;
         int i_type = 2;
@@ -778,10 +775,9 @@ class BufferX264Encoder extends Encoder {
         int b_deterministic = 0;
         int b_cpu_independent = 0;
         int i_sync_lookahead = -1;
-        int i_width = 1920;
-        int i_height = 1080;
-        int i_csp = 2;
-        int i_bitdepth = 8;
+        //int i_width = 1920;
+        //int i_height = 1080;
+
         int i_level_idc = 9;
         int i_frame_total = 15;
         int i_nal_hrd = 0;
@@ -914,7 +910,8 @@ class BufferX264Encoder extends Encoder {
 
         byte[] sei = new byte[1000];
         int sei_size = 1000;
-        String preset = "medium";
+        //Test test;
+        //String preset = "medium";
         String tune = "film";
         String profile = "main";
         String level = "4.1";

@@ -54,12 +54,6 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     jfieldID iHeightFieldID = env->GetFieldID(x264ParamsClass, "i_height", "I");
     jfieldID iCspFieldID = env->GetFieldID(x264ParamsClass, "i_csp", "I");
     jfieldID iBitdepthFieldID = env->GetFieldID(x264ParamsClass, "i_bitdepth", "I");
-    jfieldID iBframeFieldID = env->GetFieldID(x264ParamsClass, "i_bframe", "I");
-    jfieldID iBframeAdaptiveFieldID = env->GetFieldID(x264ParamsClass, "i_bframe_adaptive", "I");
-    jfieldID iBframeBiasFieldID = env->GetFieldID(x264ParamsClass, "i_bframe_bias", "I");
-    jfieldID iBframePyramidFieldID = env->GetFieldID(x264ParamsClass, "i_bframe_pyramid", "I");
-    jfieldID intraFieldID = env->GetFieldID(x264AnalyseClass, "intra", "J");
-    jfieldID interFieldID = env->GetFieldID(x264AnalyseClass, "inter", "J");
 
     jstring presetValueObj = (jstring)env->GetObjectField(x264ConfigParamsObj, presetFieldID);
     const char *presetValue = env->GetStringUTFChars(presetValueObj, NULL);
@@ -68,17 +62,9 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     jint iHeightValue = env->GetIntField(x264ParamsObj, iHeightFieldID);
     jint iCspValue = env->GetIntField(x264ParamsObj, iCspFieldID);
     jint iBitdepthValue = env->GetIntField(x264ParamsObj, iBitdepthFieldID);
-    jint iBframeValue = env->GetIntField(x264ParamsObj, iBframeFieldID);
-    jint iBframeAdaptiveValue = env->GetIntField(x264ParamsObj, iBframeAdaptiveFieldID);
-    jint iBframeBiasValue = env->GetIntField(x264ParamsObj, iBframeBiasFieldID);
-    jint iBframePyramidValue = env->GetIntField(x264ParamsObj, iBframePyramidFieldID);
-    jlong intraValue = env->GetLongField(x264AnalyseObj, intraFieldID);
-    jlong interValue = env->GetLongField(x264AnalyseObj, interFieldID);
 
     if (x264_param_default_preset(&x264Params, presetValue, "zerolatency") < 0) {
         LOGI("Failed to set preset: %s", presetValue);
-    } else {
-        LOGI("Preset set to: %s", presetValue);
     }
 
     // Mapping to x264 structure members
@@ -87,13 +73,6 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     x264Params.i_height = iHeightValue;
     x264Params.i_csp = iCspValue;
     x264Params.i_bitdepth = iBitdepthValue;
-    x264Params.i_frame_reference = 1;
-    x264Params.i_bframe = iBframeValue;
-    x264Params.i_bframe_adaptive = iBframeAdaptiveValue;
-    x264Params.i_bframe_bias = iBframeBiasValue;
-    x264Params.i_bframe_pyramid = iBframePyramidValue;
-    x264Params.analyse.intra = intraValue;
-    x264Params.analyse.inter = interValue;
 
     x264encoder->encoder = x264_encoder_open(&x264Params);
     x264_t *encoder = x264encoder->encoder;
@@ -175,6 +154,7 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
     if (frame_size >= 0) {
+        // TODO: Added total_size = 2 for debugging purpose
         int total_size = 2;
         for (int i = 0; i < nnal; i++) {
             total_size += nal[i].i_payload;
@@ -188,8 +168,6 @@ int X264Encoder::encode(JNIEnv *env, jobject obj, jbyteArray yBuffer, jbyteArray
         jbyte *out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
 
         int offset = 2;
-//        out_buffer_data[0] = 0;
-//        out_buffer_data[1] = 0;
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS || nal[i].i_type == NAL_SEI ||
             nal[i].i_type == NAL_AUD || nal[i].i_type == NAL_FILLER) {
