@@ -159,30 +159,30 @@ class BufferX264Encoder extends Encoder {
         return inputBuffer;
     }
 
-public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, String format) {
-    int ySize = width * height;
-    int uvSize;
+    public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, String format) {
+        int ySize = width * height;
+        int uvSize;
 
-    byte[] concatenatedPlanes;
-    if ("yuv420p".equalsIgnoreCase(format)) {
-        uvSize = width * height / 4;
-        concatenatedPlanes = new byte[ySize + 2 * uvSize];
+        byte[] concatenatedPlanes;
+        if ("yuv420p".equalsIgnoreCase(format)) {
+            uvSize = width * height / 4;
+            concatenatedPlanes = new byte[ySize + 2 * uvSize];
 
-        System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
-        System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize);
-        System.arraycopy(yuvData, ySize + uvSize, concatenatedPlanes, ySize + uvSize, uvSize);
-    } else if ("nv12".equalsIgnoreCase(format) || "nv21".equalsIgnoreCase(format)) {
-        uvSize = width * height / 2;
-        concatenatedPlanes = new byte[ySize + uvSize];
+            System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
+            System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize);
+            System.arraycopy(yuvData, ySize + uvSize, concatenatedPlanes, ySize + uvSize, uvSize);
+        } else if ("nv12".equalsIgnoreCase(format) || "nv21".equalsIgnoreCase(format)) {
+            uvSize = width * height / 2;
+            concatenatedPlanes = new byte[ySize + uvSize];
 
-        System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
-        System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize); // UV interleaved plane
-    } else {
-        throw new IllegalArgumentException("Unsupported YUV format: " + format);
+            System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
+            System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize); // UV interleaved plane
+        } else {
+            throw new IllegalArgumentException("Unsupported YUV format: " + format);
+        }
+
+        return concatenatedPlanes;
     }
-
-    return concatenatedPlanes;
-}
 
     public static byte[][] extractSpsPps(byte[] headerArray) {
         int spsStart = -1;
@@ -418,17 +418,17 @@ public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, Str
                         format.setInteger(MediaFormat.KEY_BIT_RATE, 800000);
                         format.setInteger(MediaFormat.KEY_FRAME_RATE, 50);
                         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
-                        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
 
                         byte[][] spsPps = extractSpsPps(headerArray);
-
                         ByteBuffer sps = ByteBuffer.wrap(spsPps[0]);
                         ByteBuffer pps = ByteBuffer.wrap(spsPps[1]);
+
                         format.setByteBuffer("csd-0", sps);
                         format.setByteBuffer("csd-1", pps);
 
                         bufferInfo = new MediaCodec.BufferInfo();
-                        muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/x264_output.mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+                        muxer = new MediaMuxer(Environment.getExternalStorageDirectory().getPath() + "/" + mTest.getEncoderX264().getOutputFile(),
+                                MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
                         videoTrackIndex = muxer.addTrack(format);
                         muxer.start();
                         muxerStarted = true;
@@ -439,8 +439,11 @@ public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, Str
                     bufferInfo.size = outputBufferSize;
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
-//                    boolean isKeyFrame = checkIfKeyFrame(outputBuffer);
-                    bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                    if (checkIfKeyFrame(outputBuffer)) {
+                        bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                    } else {
+                        bufferInfo.flags = 0;
+                    }
 
                     if(muxer != null) {
                         buffer.position(bufferInfo.offset);
