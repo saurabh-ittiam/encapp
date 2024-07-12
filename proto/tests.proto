@@ -146,7 +146,7 @@ message Serial {
 
 message EncoderX264 {
   optional string preset = 1 [default = "medium"];
-  optional int32 colorSpace = 2 [default = 2];
+  optional string colorSpace = 2 [default = "yuv420p"];
   optional int32 bitdepth = 3 [default = 8];
 }
 

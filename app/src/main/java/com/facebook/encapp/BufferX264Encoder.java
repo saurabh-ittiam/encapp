@@ -40,9 +40,8 @@ class BufferX264Encoder extends Encoder {
     }
 
     public static native int x264Init(X264ConfigParams x264ConfigParamsInstance, int width, int height,
-                                      int colourSpace, int bitdepth, byte[] headerArray);
-    public static native int x264Encode(byte[] yBuffer, byte[] uBuffer, byte[] vBuffer,
-                                        byte[] outputBuffer, int width, int height, int colourSpace);
+                                      String colourSpace, int bitdepth, byte[] headerArray);
+    public static native int x264Encode(byte[] planes, byte[] outputBuffer, int width, int height, String colourSpace);
     public static native void x264Close();
 
     public BufferX264Encoder(Test test) {
@@ -160,20 +159,30 @@ class BufferX264Encoder extends Encoder {
         return inputBuffer;
     }
 
-    public static byte[][] extractYUVPlanes(byte[] yuvData, int width, int height) {
-        int frameSize = width * height;
-        int qFrameSize = frameSize / 4;
+public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, String format) {
+    int ySize = width * height;
+    int uvSize;
 
-        byte[] yPlane = new byte[frameSize];
-        byte[] uPlane = new byte[qFrameSize];
-        byte[] vPlane = new byte[qFrameSize];
+    byte[] concatenatedPlanes;
+    if ("yuv420p".equalsIgnoreCase(format)) {
+        uvSize = width * height / 4;
+        concatenatedPlanes = new byte[ySize + 2 * uvSize];
 
-        System.arraycopy(yuvData, 0, yPlane, 0, frameSize);
-        System.arraycopy(yuvData, frameSize, uPlane, 0, qFrameSize);
-        System.arraycopy(yuvData, frameSize + qFrameSize, vPlane, 0, qFrameSize);
+        System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
+        System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize);
+        System.arraycopy(yuvData, ySize + uvSize, concatenatedPlanes, ySize + uvSize, uvSize);
+    } else if ("nv12".equalsIgnoreCase(format) || "nv21".equalsIgnoreCase(format)) {
+        uvSize = width * height / 2;
+        concatenatedPlanes = new byte[ySize + uvSize];
 
-        return new byte[][]{yPlane, uPlane, vPlane};
+        System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
+        System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize); // UV interleaved plane
+    } else {
+        throw new IllegalArgumentException("Unsupported YUV format: " + format);
     }
+
+    return concatenatedPlanes;
+}
 
     public static byte[][] extractSpsPps(byte[] headerArray) {
         int spsStart = -1;
@@ -254,7 +263,7 @@ class BufferX264Encoder extends Encoder {
         String preset = mTest.getEncoderX264().getPreset();
         int width = sourceResolution.getWidth();
         int height = sourceResolution.getHeight();
-        int colourSpace = mTest.getEncoderX264().getColorSpace();
+        String colorSpace = mTest.getEncoderX264().getColorSpace();
         int bitdepth = mTest.getEncoderX264().getBitdepth();
 
         // The below x264 options will be configurable using pbtxt
@@ -360,7 +369,7 @@ class BufferX264Encoder extends Encoder {
             byte[] headerArray = new byte[estimatedSize];
             int outputBufferSize;
 
-            int sizeOfHeader = x264Init(x264ConfigParamsInstance, width, height, colourSpace, bitdepth, headerArray);
+            int sizeOfHeader = x264Init(x264ConfigParamsInstance, width, height, colorSpace, bitdepth, headerArray);
             boolean flagHeaderSize = true;
 
             while (!input_done || !output_done) {
@@ -382,9 +391,9 @@ class BufferX264Encoder extends Encoder {
                             continue;
                         }
 
-                        byte[][] planes = extractYUVPlanes(yuvData, width, height);
+                        byte[] planes = extractYUVPlanes(yuvData, width, height, colorSpace);
 
-                        outputBufferSize = x264Encode(planes[0], planes[1], planes[2], outputBuffer, width, height, colourSpace);
+                        outputBufferSize = x264Encode(planes, outputBuffer, width, height, colorSpace);
                         if (outputBufferSize == 0) {
                             return "Failed to encode frame";
                         }
