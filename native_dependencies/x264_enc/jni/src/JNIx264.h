@@ -13,7 +13,8 @@ public:
                     jobject x264ConfigParamsObj, int width, int height,
                     jstring jColorSpace, int bitDepth, jbyteArray headerArray);
 
-    int encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyteArray out_buffer, jint width, jint height, jstring jColorSpace);
+    int encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyteArray out_buffer,
+               jint width, jint height, jstring jColorSpace, jobject x264FindIDRObj);
 
     void close();
 
@@ -43,7 +44,8 @@ extern "C" {
                                                                        jstring jColorSpace, int bitDepth, jbyteArray headerArray);
 
     JNIEXPORT jint Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer,
-                                                                         jbyteArray out_buffer, jint width, jint height, jstring jColorSpace);
+                                                                         jbyteArray out_buffer, jint width, jint height,
+                                                                         jstring jColorSpace, jobject x264FindIDRObj);
 
     JNIEXPORT void Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj);
 

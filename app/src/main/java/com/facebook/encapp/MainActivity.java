@@ -646,10 +646,13 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } else {
-//                Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
-//                coder = new BufferEncoder(test);
-                Log.d(TAG, "BufferX264Encoder test");
-                coder = new BufferX264Encoder(test);
+                if ("encoder.x264".equals(test.getConfigure().getCodec())) {
+                    Log.d(TAG, "BufferX264Encoder test");
+                    coder = new BufferX264Encoder(test);
+                } else {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] BufferEncoder test");
+                    coder = new BufferEncoder(test);
+                }
 
             }
 

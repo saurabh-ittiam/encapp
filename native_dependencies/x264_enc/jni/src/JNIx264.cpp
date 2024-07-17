@@ -42,13 +42,15 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     jclass x264ConfigParamsClass = env->GetObjectClass(x264ConfigParamsObj);
 
     jfieldID presetFieldID = env->GetFieldID(x264ConfigParamsClass, "preset", "Ljava/lang/String;");
+    jfieldID threadsFieldID = env->GetFieldID(x264ConfigParamsClass, "threads", "I");
 
     jstring presetValueObj = (jstring)env->GetObjectField(x264ConfigParamsObj, presetFieldID);
     const char *presetValue = env->GetStringUTFChars(presetValueObj, NULL);
-
     if (x264_param_default_preset(&x264Params, presetValue, "zerolatency") < 0) {
         LOGI("Failed to set preset: %s", presetValue);
     }
+
+    jint threadsValue = env->GetIntField(x264ConfigParamsObj, threadsFieldID);
 
     const char *cColorSpace = env->GetStringUTFChars(jColorSpace, NULL);
     int colorSpace;
@@ -66,7 +68,7 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     }
 
     // Mapping to x264 structure members
-    x264Params.i_threads = 1;
+    x264Params.i_threads = threadsValue;
     x264Params.i_width = width;
     x264Params.i_height = height;
     x264Params.i_csp = colorSpace;
@@ -110,13 +112,18 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     return size_of_headers;
 }
 
-int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyteArray out_buffer, jint width, jint height, jstring jColorSpace) {
+int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyteArray out_buffer,
+                        jint width, jint height, jstring jColorSpace, jobject x264FindIDRObj) {
     if (!encoder) {
         LOGI("Encoder is not initialized for encoding");
         return -1;
     }
     x264_picture_t pic_in = {0};
     x264_picture_t pic_out = {0};
+
+    jclass x264FindIDRClass = env->GetObjectClass(x264FindIDRObj);
+    jfieldID checkIDRFieldID = env->GetFieldID(x264FindIDRClass, "checkIDR", "Z");
+    jboolean checkIDR;
 
     jsize yuvBuffer_size = env->GetArrayLength(yuvBuffer);
     jsize out_buffer_size = env->GetArrayLength(out_buffer);
@@ -172,6 +179,11 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
     if (frame_size > 0) {
         // TODO: Added total_size = 2 for debugging purpose
         for (int i = 0; i < nnal; i++) {
+            if (nal[i].i_type == NAL_SLICE_IDR) {
+                checkIDR = true;
+            } else {
+                checkIDR = false;
+            }
             total_size += nal[i].i_payload;
         }
 
@@ -179,6 +191,7 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
             out_buffer = env->NewByteArray(total_size);
         }
 
+        env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
         jbyte *out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
 
         int offset = 2;
@@ -219,8 +232,9 @@ extern "C" {
     }
 
     JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer,
-                                                                                 jbyteArray outBuffer, jint width, jint height, jstring jColorSpace) {
-        return X264Encoder::getInstance().encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace);
+                                                                                 jbyteArray outBuffer, jint width, jint height,
+                                                                                 jstring jColorSpace, jobject x264FindIDRObj) {
+        return X264Encoder::getInstance().encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace, x264FindIDRObj);
     }
 
     JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj) {

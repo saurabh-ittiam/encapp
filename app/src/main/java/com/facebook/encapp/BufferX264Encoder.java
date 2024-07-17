@@ -41,7 +41,8 @@ class BufferX264Encoder extends Encoder {
 
     public static native int x264Init(X264ConfigParams x264ConfigParamsInstance, int width, int height,
                                       String colourSpace, int bitdepth, byte[] headerArray);
-    public static native int x264Encode(byte[] planes, byte[] outputBuffer, int width, int height, String colourSpace);
+    public static native int x264Encode(byte[] planes, byte[] outputBuffer, int width, int height,
+                                        String colourSpace, findIDR findIDRInstance);
     public static native void x264Close();
 
     public BufferX264Encoder(Test test) {
@@ -93,8 +94,9 @@ class BufferX264Encoder extends Encoder {
         int chromaoffset;
         int sc_threshold;
         int noise_reduction;
+        int threads;
 
-        public X264ConfigParams(String preset, String tune, boolean fastfirstpass, String wpredp, float crf, float crf_max, int qp, int aq_mode, int variance, int autovariance, int autovariance_biased, float aq_strength, boolean psy, float psy_rd, int rc_lookahead, boolean weightb, int weightp, boolean ssim, boolean intra_refresh, boolean bluray_compat, int b_bias, int b_pyramid, boolean mixed_refs, boolean dct_8x8, boolean fast_pskip, boolean aud, boolean mbtree, String deblock, float cplxblur, String partitions, int direct_pred, int slice_max_size, String stats, int nal_hrd, int avcintra_class, int me_method, int motion_est, boolean forced_idr, int coder, int b_strategy, int chromaoffset, int sc_threshold, int noise_reduction) {
+        public X264ConfigParams(String preset, String tune, boolean fastfirstpass, String wpredp, float crf, float crf_max, int qp, int aq_mode, int variance, int autovariance, int autovariance_biased, float aq_strength, boolean psy, float psy_rd, int rc_lookahead, boolean weightb, int weightp, boolean ssim, boolean intra_refresh, boolean bluray_compat, int b_bias, int b_pyramid, boolean mixed_refs, boolean dct_8x8, boolean fast_pskip, boolean aud, boolean mbtree, String deblock, float cplxblur, String partitions, int direct_pred, int slice_max_size, String stats, int nal_hrd, int avcintra_class, int me_method, int motion_est, boolean forced_idr, int coder, int b_strategy, int chromaoffset, int sc_threshold, int noise_reduction, int threads) {
             this.preset = preset;
             this.tune = tune;
             this.fastfirstpass = fastfirstpass;
@@ -138,9 +140,17 @@ class BufferX264Encoder extends Encoder {
             this.chromaoffset = chromaoffset;
             this.sc_threshold = sc_threshold;
             this.noise_reduction = noise_reduction;
+            this.threads = threads;
         }
     }
 
+    public static class findIDR {
+        boolean checkIDR;
+
+        public findIDR(boolean checkIDR) {
+            this.checkIDR = checkIDR;
+        }
+    }
     private long computePresentationTimeUs(int frameIndex) {
         return frameIndex * 1000000 / 30;
     }
@@ -217,24 +227,6 @@ class BufferX264Encoder extends Encoder {
         return new byte[][]{spsBuffer, ppsBuffer};
     }
 
-    public boolean checkIfKeyFrame(byte[] bitstream) {
-        int nalUnitType;
-        for (int i = 0; i < bitstream.length - 4; i++) {
-            // Check for the start code 0x00000001 or 0x000001
-            if ((bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x00 && bitstream[i+3] == 0x01) ||
-                    (bitstream[i] == 0x00 && bitstream[i+1] == 0x00 && bitstream[i+2] == 0x01)) {
-
-                nalUnitType = bitstream[i + (bitstream[i + 2] == 0x01 ? 3 : 4)] & 0x1F;
-
-                // Check if the NAL unit type is 5 (IDR frame)
-                if (nalUnitType == 5) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     public String start() {
         Log.d(TAG, "** Raw buffer encoding - " + mTest.getCommon().getDescription() + " **");
         try {
@@ -265,6 +257,7 @@ class BufferX264Encoder extends Encoder {
         int height = sourceResolution.getHeight();
         String colorSpace = mTest.getEncoderX264().getColorSpace();
         int bitdepth = mTest.getEncoderX264().getBitdepth();
+        int threads = mTest.getEncoderX264().getThreads();
 
         // The below x264 options will be configurable using pbtxt
         String tune = "ssim";
@@ -313,8 +306,11 @@ class BufferX264Encoder extends Encoder {
         X264ConfigParams x264ConfigParamsInstance = new X264ConfigParams(
                 preset, tune, fastfirstpass, wpredp, crf, crf_max, qp, aq_mode, variance, autovariance, autovariance_biased, aq_strength, psy, psy_rd, rc_lookahead,
                 weightb, weightp, ssim, intra_refresh, bluray_compat, b_bias, b_pyramid, mixed_refs, dct_8x8, fast_pskip, aud, mbtree, deblock, cplxblur, partitions,
-                direct_pred, slice_max_size, stats, nal_hrd, avcintra_class, me_method, motion_est, forced_idr, coder, b_strategy, chromaoffset, sc_threshold, noise_reduction
+                direct_pred, slice_max_size, stats, nal_hrd, avcintra_class, me_method, motion_est, forced_idr, coder, b_strategy, chromaoffset, sc_threshold, noise_reduction, threads
         );
+
+        boolean checkIDR = false;
+        findIDR findIDRInstance = new findIDR(checkIDR);
 
         if (!mYuvReader.openFile(checkFilePath(mTest.getInput().getFilepath()), mTest.getInput().getPixFmt())) {
             return "Could not open file";
@@ -338,7 +334,6 @@ class BufferX264Encoder extends Encoder {
                 e.printStackTrace();
             }
         }
-        mStats.start();
 
         String outputStreamName = "x264_output.h264";
         String headerDump = "x264_header_dump.h264";
@@ -393,7 +388,11 @@ class BufferX264Encoder extends Encoder {
 
                         byte[] planes = extractYUVPlanes(yuvData, width, height, colorSpace);
 
-                        outputBufferSize = x264Encode(planes, outputBuffer, width, height, colorSpace);
+                        long tsNano = System.nanoTime();
+                        mStats.startEncodingFrame(tsNano, mFramesAdded);
+                        outputBufferSize = x264Encode(planes, outputBuffer, width, height, colorSpace, findIDRInstance);
+                        mStats.stopEncodingFrame(tsNano, outputBufferSize, findIDRInstance.checkIDR);
+
                         if (outputBufferSize == 0) {
                             return "Failed to encode frame";
                         }
@@ -439,7 +438,7 @@ class BufferX264Encoder extends Encoder {
                     bufferInfo.size = outputBufferSize;
                     bufferInfo.presentationTimeUs = computePresentationTimeUsec(mFramesAdded, mRefFrameTime);
 
-                    if (checkIfKeyFrame(outputBuffer)) {
+                    if (findIDRInstance.checkIDR) {
                         bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
                     } else {
                         bufferInfo.flags = 0;

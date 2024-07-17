@@ -149,6 +149,7 @@ message EncoderX264 {
   optional string colorSpace = 2 [default = "yuv420p"];
   optional int32 bitdepth = 3 [default = 8];
   optional string outputFile = 4 [default = "x264Output.mp4"];
+  optional int32 threads = 5 [default = 8];
 }
 
 message Test {
