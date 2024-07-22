@@ -1,0 +1,9 @@
+{
+    "props": {
+        "BuildVersion": "21F90",
+        "CPUArchitecture": "arm64e",
+        "ro.board.platform": "t8101",
+        "ro.product.model": "D53gAP",
+        "ro.serialno": "00008101-001954191E00801E"
+    }
+}

@@ -9,7 +9,7 @@ import typing
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
-IDB_BUNDLE_ID = "Meta.Encapp"
+IDB_BUNDLE_ID = "YashP.Encapp"
 IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
 

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3ABA519E2C46A4F60013372F /* X264Wrapper.m in Sources */ = {isa = PBXBuildFile; fileRef = 3ABA519D2C46A4F60013372F /* X264Wrapper.m */; };
+		3ABA51A02C46A50B0013372F /* X264Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ABA519F2C46A50B0013372F /* X264Encoder.swift */; };
+		3AD568992C4A748A00CCCEBD /* libx264.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AD568982C4A747600CCCEBD /* libx264.a */; };
 		CA53D6F729689DB200485E4D /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA53D6F629689DB200485E4D /* Decoder.swift */; };
 		CA8256F6293E7BEB0082B2BE /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CA8256F5293E7BEB0082B2BE /* SwiftProtobuf */; };
 		CA8256F8293E7BEB0082B2BE /* SwiftProtobufPluginLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = CA8256F7293E7BEB0082B2BE /* SwiftProtobufPluginLibrary */; };
@@ -57,6 +60,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3A38D9DA2C46A0970066C1E2 /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		3A38D9DC2C46A0970066C1E2 /* x264.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264.h; sourceTree = "<group>"; };
+		3A38D9DD2C46A0970066C1E2 /* x264_config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264_config.h; sourceTree = "<group>"; };
+		3A38D9DE2C46A0970066C1E2 /* x264cli.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264cli.h; sourceTree = "<group>"; };
+		3ABA519C2C46A4D90013372F /* X264Wrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X264Wrapper.h; sourceTree = "<group>"; };
+		3ABA519D2C46A4F60013372F /* X264Wrapper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = X264Wrapper.m; sourceTree = "<group>"; };
+		3ABA519F2C46A50B0013372F /* X264Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X264Encoder.swift; sourceTree = "<group>"; };
+		3ABA51A12C46A57F0013372F /* Encapp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Encapp-Bridging-Header.h"; sourceTree = "<group>"; };
+		3AD568982C4A747600CCCEBD /* libx264.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libx264.a; sourceTree = "<group>"; };
 		CA53D6F629689DB200485E4D /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
 		CAAB92C2292D2ABB009009B2 /* Encapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Encapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CAAB92C5292D2ABB009009B2 /* EncappApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncappApp.swift; sourceTree = "<group>"; };
@@ -87,6 +99,7 @@
 			files = (
 				CAAB92F4292D2ADF009009B2 /* SwiftProtobufPluginLibrary in Frameworks */,
 				CAAB92F2292D2ADF009009B2 /* SwiftProtobuf in Frameworks */,
+				3AD568992C4A748A00CCCEBD /* libx264.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +132,11 @@
 		CAAB92B9292D2ABB009009B2 = {
 			isa = PBXGroup;
 			children = (
+				3A38D9DA2C46A0970066C1E2 /* config.h */,
+				3AD568982C4A747600CCCEBD /* libx264.a */,
+				3A38D9DD2C46A0970066C1E2 /* x264_config.h */,
+				3A38D9DC2C46A0970066C1E2 /* x264.h */,
+				3A38D9DE2C46A0970066C1E2 /* x264cli.h */,
 				CAAB92C4292D2ABB009009B2 /* Encapp */,
 				CAAB92C3292D2ABB009009B2 /* Products */,
 				CA8256F4293E7BDF0082B2BE /* Frameworks */,
@@ -149,6 +167,10 @@
 				CAAB92C9292D2ABC009009B2 /* Assets.xcassets */,
 				CAAB92CB292D2ABC009009B2 /* Encapp.entitlements */,
 				CAAB92CC292D2ABC009009B2 /* Preview Content */,
+				3ABA519C2C46A4D90013372F /* X264Wrapper.h */,
+				3ABA519D2C46A4F60013372F /* X264Wrapper.m */,
+				3ABA519F2C46A50B0013372F /* X264Encoder.swift */,
+				3ABA51A12C46A57F0013372F /* Encapp-Bridging-Header.h */,
 			);
 			path = Encapp;
 			sourceTree = "<group>";
@@ -252,6 +274,7 @@
 				TargetAttributes = {
 					CAAB92C1292D2ABB009009B2 = {
 						CreatedOnToolsVersion = 14.0;
+						LastSwiftMigration = 1500;
 					};
 					CAAB92D2292D2ABD009009B2 = {
 						CreatedOnToolsVersion = 14.0;
@@ -327,9 +350,11 @@
 				CAAB92FD292D7A44009009B2 /* FileHandling.swift in Sources */,
 				CAAB92C6292D2ABB009009B2 /* EncappApp.swift in Sources */,
 				CAAB931029395655009009B2 /* TestRunner.swift in Sources */,
+				3ABA51A02C46A50B0013372F /* X264Encoder.swift in Sources */,
 				CAAB9307293910D9009009B2 /* Statistics.swift in Sources */,
 				CAAB92F6292D2B89009009B2 /* tests.pb.swift in Sources */,
 				CAAB9313293A7478009009B2 /* CodecHelper.swift in Sources */,
+				3ABA519E2C46A4F60013372F /* X264Wrapper.m in Sources */,
 				CA53D6F729689DB200485E4D /* Decoder.swift in Sources */,
 				CAAB930D29392CC8009009B2 /* JsonStats.swift in Sources */,
 			);
@@ -500,6 +525,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Encapp/Encapp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Development";
@@ -508,7 +534,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Encapp/Preview Content\"";
-				DEVELOPMENT_TEAM = HG384GL4RL;
+				DEVELOPMENT_TEAM = 7V947RP993;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -522,17 +548,23 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Meta.Encapp;
+				PRODUCT_BUNDLE_IDENTIFIER = YashP.Encapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Encapp/Encapp-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -543,6 +575,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Encapp/Encapp.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Development";
@@ -551,7 +584,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Encapp/Preview Content\"";
-				DEVELOPMENT_TEAM = HG384GL4RL;
+				DEVELOPMENT_TEAM = 7V947RP993;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -564,16 +597,21 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 12.3;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = Meta.Encapp;
+				PRODUCT_BUNDLE_IDENTIFIER = YashP.Encapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Encapp/Encapp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

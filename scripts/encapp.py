@@ -169,26 +169,34 @@ def remove_encapp_gen_files(
 
 
 def wait_for_exit(serial, debug=0):
+    print("wait for exit entered")
     if debug > 0:
         print("\n\n*** Wait for exit **\n\n")
+        
     time.sleep(2)
     if encapp_tool.adb_cmds.USE_IDB:
         state = "Running"
+        
         while state == "Running":
             time.sleep(1)
             # ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f"idb list-apps  --fetch-process-state  --udid {serial} | grep {encapp_tool.adb_cmds.IDB_BUNDLE_ID}")
             # state = stdout.split("|")[4].strip()
             # Since the above does not work (not state info), let us look for the lock file
+            
             if not encapp_tool.adb_cmds.file_exists_in_device("running.lock", serial):
                 state = "Done"
+                
     else:
+        
         pid = -1
         current = 1
         while current != -1:
+            
             current = encapp_tool.adb_cmds.get_app_pid(
                 serial, encapp_tool.app_utils.APPNAME_MAIN, debug
             )
             if current > 0:
+               
                 pid = current
             time.sleep(1)
         if pid != -1 and debug > 0:
@@ -196,6 +204,8 @@ def wait_for_exit(serial, debug=0):
 
     if debug > 0:
         print("\n\n*** Done waiting **\n\n")
+    
+    print("wait for exit finised")
 
 
 def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
@@ -314,6 +324,8 @@ def collect_results(
                 f"idb launch --udid {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
                 debug,
             )
+
+            print("reset hit")
         else:
             ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(
                 f"xcrun devicectl device process launch --device {serial} {encapp_tool.adb_cmds.IDB_BUNDLE_ID} reset",
@@ -1115,6 +1127,7 @@ def run_codec_tests(
                 protobuf_txt_filepath = f"{test.common.id}.pbtxt"
             else:
                 protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
+            print("runtest called 1")
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
 
             with open(tests_run, "a") as passed:
@@ -1123,7 +1136,7 @@ def run_codec_tests(
             # Pull the log file (it will be overwritten otherwise)
             if encapp_tool.adb_cmds.USE_IDB:
                 print(
-                    "Currently filesystem synch on ios seems to be slow, sleep a little while"
+                    "Currently filesystem synch on ios seems to be slow, sleep a little whissssssssssle"
                 )
                 time.sleep(1)
                 cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
@@ -1135,12 +1148,14 @@ def run_codec_tests(
                     )
                 except:
                     print("Changing name on the ios log file")
-            print("Collect results")
+            
             collected_results.extend(
                 collect_results(
                     local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
                 )
             )
+
+
 
     else:
         # (b) one pbtxt for all tests
@@ -1183,7 +1198,7 @@ def run_codec_tests(
         # Pull the log file (it will be overwritten otherwise)
         if encapp_tool.adb_cmds.USE_IDB:
             print(
-                "Currently filesystem synch on ios seems to be slow, sleep a little while"
+                "Currently filesystem synch on ios seems to be slow, sleep a little whiaaaaale"
             )
             time.sleep(1)
             cmd = f"idb file pull {device_workdir}/encapp.log {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
@@ -1197,6 +1212,8 @@ def run_codec_tests(
                 print(f"ERROR: Changing name on the ios log file: {ex}")
         if ignore_results:
             return None, None
+        
+        
         collected_results.extend(
             collect_results(
                 local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
