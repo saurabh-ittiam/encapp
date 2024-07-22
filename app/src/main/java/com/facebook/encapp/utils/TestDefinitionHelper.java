@@ -70,10 +70,10 @@ public class TestDefinitionHelper {
             mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval);
         }
         // color parameters
-        if (config.hasColorFormat()) {
-            int colorFormat  = config.getColorFormat();
-            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
-        }
+//        if (config.hasColorFormat()) {
+//            int colorFormat  = config.getColorFormat();
+//            mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
+//        }
         // good default: MediaFormat.COLOR_RANGE_LIMITED
         if (config.hasColorRange()) {
             int colorRange  = config.getColorRange().getNumber();
@@ -94,6 +94,13 @@ public class TestDefinitionHelper {
         for (MediaCodecInfo codecInfo : codecs) {
             if (codecInfo.getName().equals(config.getCodec())) {
                 MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(config.getMime());
+                if (config.hasColorFormat()) {
+                    if(config.getCodec().toLowerCase(Locale.US).contains(".mtk.")) {
+                        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+                    } else{
+                        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+                    }
+                }
                 int bitrateMode = -1;
                 if (config.hasBitrateMode()){
                     if(capabilities.getEncoderCapabilities().isBitrateModeSupported(config.getBitrateMode().getNumber())){

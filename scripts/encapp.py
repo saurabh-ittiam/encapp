@@ -24,6 +24,10 @@ import encapp_tool.app_utils
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import copy
+import sys
+import threading
+import time
+import signal
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -272,6 +276,7 @@ def collect_results(
         if file.endswith(".json"):
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
+        # add cpu load to json
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id Meta.Encapp"
@@ -460,7 +465,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         # https://stackoverflow.com/a/30359308
         if not os.path.exists(options.mediastore):
             os.mkdir(options.mediastore)
-        basename = os.path.basename(test.input.filepath)
+        basename = os.path.basename(filepath)
         if not os.path.exists(f"{options.mediastore}/{basename}"):
             shutil.copy2(filepath, f"{options.mediastore}/{basename}")
 
@@ -472,14 +477,14 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if options.split:
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
-        for test in test_suite.test:
-            output_dir = f"{local_workdir}/{test.common.id}"
-            if not os.path.exists(output_dir):
-                os.mkdir(output_dir)
-            filename = f"{output_dir}/{test.common.id}.pbtxt"
-            with open(filename, "w") as f:
-                f.write(text_format.MessageToString(test))
-            files_to_push |= {filename}
+        # for test in test_suite.test:
+        #     output_dir = f"{local_workdir}/{test.common.id}"
+        #     if not os.path.exists(output_dir):
+        #         os.mkdir(output_dir)
+        #     filename = f"{output_dir}/{test.common.id}.pbtxt"
+        #     with open(filename, "w") as f:
+        #         f.write(text_format.MessageToString(test))
+        #     files_to_push |= {filename}
     else:
         # (b) one pbtxt for all tests
         protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
@@ -1016,7 +1021,12 @@ def run_codec_tests(
                 protobuf_txt_filepath = f"{test.common.id}.pbtxt"
             else:
                 protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
+            #add start cpu load
+            cpu_usage_file = f'{local_workdir}/{test.common.id}_cpu_usage.txt'
+            stop_event, monitor_thread, cpu_usage_file = start_cpu_monitoring(serial, cpu_usage_file, debug)
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
+            # end cpu load
+            stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file)
 
             with open(tests_run, "a") as passed:
                 passed.write(f"{test.common.id}.pbtxt\n")
@@ -1071,7 +1081,7 @@ def run_codec_tests(
 
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
-
+        #encapp test start
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
@@ -1098,6 +1108,85 @@ def run_codec_tests(
         )
     return collected_results
 
+def start_cpu_monitoring(serial, cpu_usage_file, debug):
+    stop_event = threading.Event()
+    cpu_usage = {}
+    monitor_thread = threading.Thread(target=capture_cpu_usage, args=(serial, cpu_usage_file, debug, stop_event))
+    monitor_thread.start()
+    return stop_event, monitor_thread, cpu_usage_file
+def capture_cpu_usage(serial, cpu_usage_file, debug, stop_event):
+    interval = 0.5
+    # while not stop_event.is_set():
+    #     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd('adb -s {serial} shell top -n 1')
+    #     # process_pids = [encapp_tool.adb_cmds.get_app_pid(serial, " media.codec ", debug),
+    #     #                 encapp_tool.adb_cmds.get_app_pid(serial, " media.swcodec ", debug),
+    #     #                 encapp_tool.adb_cmds.get_app_pid(serial, encapp_tool.app_utils.APPNAME_MAIN, debug)]
+
+    #     # cpu_usage = {pid: [] for pid in process_pids}
+    #     # if ret:
+    #     #     for line in stdout.splitlines():
+    #     #         for pid in cpu_usage[pid]:
+    #     #             if str(pid) in line:
+    #     #                 columns = line.split()
+    #     #                 if len(columns) > 8 and columns[8].replace('.', '', 1).isdigit():
+    #     #                     usage = float(columns[8])
+    #     #                     cpu_usage[pid].append(usage)
+    #     #                 else:
+    #     #                     print(f"Skipping line: {line}")
+    #     time.sleep(interval)
+    # return cpu_usage_file
+    
+    with open(cpu_usage_file, 'a') as f:
+        while not stop_event.is_set():
+            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f'adb -s {serial} shell top -n 1')
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%Y/%m/%d_%H:%M:%S")
+            if ret:
+                f.write(f'{timestamp}\n\n{stdout}\n')
+            else:
+                f.write(f'{timestamp}\nError: {stderr}\n')
+            time.sleep(interval)
+    return cpu_usage_file
+
+def signal_handler(sig, frame):
+    print('Exiting gracefully...')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+# Calculate the average CPU usage and write results to CSV
+def stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file):
+    stop_event.set()
+    monitor_thread.join()
+
+    avg_cpu_usage = {}
+    # for pid, usages in cpu_usage.items():
+    #     if usages:
+    #         avg_cpu_usage[pid] = sum(usages) / len(usages)
+    #     else:
+    #         avg_cpu_usage[pid] = 0.0
+
+    # with open(output_file, 'w', newline='') as csvfile:
+    #     fieldnames = ['Timestamp'] + [f'PID_{pid}' for pid in cpu_usage[pid]] + [f'Average_PID_{pid}' for pid in cpu_usage[pid]]
+    #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    #     writer.writeheader()
+
+    #     max_len = max(len(usages) for usages in cpu_usage.values())
+    #     for i in range(max_len):
+    #         row = {'Timestamp': i}
+    #         for pid in cpu_usage[pid]:
+    #             row[f'PID_{pid}'] = cpu_usage[pid][i] if i < len(cpu_usage[pid]) else ''
+    #         writer.writerow(row)
+
+    #     avg_row = {'Timestamp': 'Average'}
+    #     for pid in cpu_usage[pid]:
+    #         avg_row[f'Average_PID_{pid}'] = avg_cpu_usage[pid]
+    #     writer.writerow(avg_row)
+
+    # print(f"Average CPU usage written to {output_file}")
+    with open(cpu_usage_file, 'r') as f:
+        for line in f:
+            print(line)
 
 def list_codecs(serial, model, device_workdir, debug=0):
     model_clean = model.replace(" ", "_")
@@ -1451,7 +1540,7 @@ def get_options(argv):
         "--split",
         action="store_true",
         dest="split",
-        default=False,
+        default=True,
         help="Run serial test individually",
     )
     parser.add_argument(
@@ -1758,10 +1847,11 @@ def main(argv):
 
         # first clear out old result
         remove_encapp_gen_files(serial, options.device_workdir, options.debug)
-        result_ok, result_json = codec_test(options, model, serial, options.debug)
 
-        if not options.ignore_results:
-            verify_app_version(result_json)
+        result_ok = codec_test(options, model, serial, options.debug)[0]
+
+        # if not options.ignore_results:
+        #     verify_app_version(result_json)
         if not result_ok:
             sys.exit(-1)
 
