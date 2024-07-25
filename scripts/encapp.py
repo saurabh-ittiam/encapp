@@ -226,7 +226,7 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
 
 
 def collect_results(
-    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
 ):
     if debug > 0:
         print(f"collecting result: {protobuf_txt_filepath}")
@@ -273,10 +273,31 @@ def collect_results(
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
         # append results file (json files) to final results
-        if file.endswith(".json"):
+        if file.strip().endswith(".json"):
+            total_cpu_usage = 0
+            
+            with open(os.path.join(local_workdir, file.strip()), 'r') as f:
+                data = json.load(f)
+            cpu_data = data.get("cpu_data", {})
+            # calculate average CPU usage for each process
+            for process, cpu_usages in process_cpu_usage.items():
+                avg_cpu_usage = 0
+                avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
+                process_cpu_usage[process].append(avg_cpu_usage)
+                total_cpu_usage += avg_cpu_usage
+                cpu_data[process] = f"{avg_cpu_usage:.2f}%"
+
+            cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
+            data["cpu_data"] = cpu_data
+                
+            with open(os.path.join(local_workdir, file.strip()), 'w') as f:
+                    json.dump(data, f, indent=2)
+                    
+            # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}    
+            
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
-        # add cpu load to json
+        
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id Meta.Encapp"
@@ -980,7 +1001,7 @@ def run_codec_tests(
     collected_results = []
     # run the test(s)
     if split:
-        # (a) one pbtxt file per subtest
+        # (a) one pbtxt file per subtest, Note CPU usage is captured for only this case
         # push just the files we need by looking up the name
         tests_run = f"{local_workdir}/tests_run.log"
         total_number = len(test_suite.test)
@@ -1021,12 +1042,12 @@ def run_codec_tests(
                 protobuf_txt_filepath = f"{test.common.id}.pbtxt"
             else:
                 protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
-            #add start cpu load
+            # start cpu usage capture
             cpu_usage_file = f'{local_workdir}/{test.common.id}_cpu_usage.txt'
             stop_event, monitor_thread, cpu_usage_file = start_cpu_monitoring(serial, cpu_usage_file, debug)
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
-            # end cpu load
-            stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file)
+            # end cpu usage capture
+            process_cpu_usage = stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file)
 
             with open(tests_run, "a") as passed:
                 passed.write(f"{test.common.id}.pbtxt\n")
@@ -1049,7 +1070,7 @@ def run_codec_tests(
             print("Collect results")
             collected_results.extend(
                 collect_results(
-                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
                 )
             )
 
@@ -1110,32 +1131,11 @@ def run_codec_tests(
 
 def start_cpu_monitoring(serial, cpu_usage_file, debug):
     stop_event = threading.Event()
-    cpu_usage = {}
     monitor_thread = threading.Thread(target=capture_cpu_usage, args=(serial, cpu_usage_file, debug, stop_event))
     monitor_thread.start()
     return stop_event, monitor_thread, cpu_usage_file
 def capture_cpu_usage(serial, cpu_usage_file, debug, stop_event):
-    interval = 0.5
-    # while not stop_event.is_set():
-    #     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd('adb -s {serial} shell top -n 1')
-    #     # process_pids = [encapp_tool.adb_cmds.get_app_pid(serial, " media.codec ", debug),
-    #     #                 encapp_tool.adb_cmds.get_app_pid(serial, " media.swcodec ", debug),
-    #     #                 encapp_tool.adb_cmds.get_app_pid(serial, encapp_tool.app_utils.APPNAME_MAIN, debug)]
-
-    #     # cpu_usage = {pid: [] for pid in process_pids}
-    #     # if ret:
-    #     #     for line in stdout.splitlines():
-    #     #         for pid in cpu_usage[pid]:
-    #     #             if str(pid) in line:
-    #     #                 columns = line.split()
-    #     #                 if len(columns) > 8 and columns[8].replace('.', '', 1).isdigit():
-    #     #                     usage = float(columns[8])
-    #     #                     cpu_usage[pid].append(usage)
-    #     #                 else:
-    #     #                     print(f"Skipping line: {line}")
-    #     time.sleep(interval)
-    # return cpu_usage_file
-    
+    interval = 0.5    
     with open(cpu_usage_file, 'a') as f:
         while not stop_event.is_set():
             ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f'adb -s {serial} shell top -n 1')
@@ -1148,45 +1148,38 @@ def capture_cpu_usage(serial, cpu_usage_file, debug, stop_event):
             time.sleep(interval)
     return cpu_usage_file
 
-def signal_handler(sig, frame):
+def signal_handler():
     print('Exiting gracefully...')
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
 
-# Calculate the average CPU usage and write results to CSV
 def stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file):
     stop_event.set()
     monitor_thread.join()
-
-    avg_cpu_usage = {}
-    # for pid, usages in cpu_usage.items():
-    #     if usages:
-    #         avg_cpu_usage[pid] = sum(usages) / len(usages)
-    #     else:
-    #         avg_cpu_usage[pid] = 0.0
-
-    # with open(output_file, 'w', newline='') as csvfile:
-    #     fieldnames = ['Timestamp'] + [f'PID_{pid}' for pid in cpu_usage[pid]] + [f'Average_PID_{pid}' for pid in cpu_usage[pid]]
-    #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-    #     writer.writeheader()
-
-    #     max_len = max(len(usages) for usages in cpu_usage.values())
-    #     for i in range(max_len):
-    #         row = {'Timestamp': i}
-    #         for pid in cpu_usage[pid]:
-    #             row[f'PID_{pid}'] = cpu_usage[pid][i] if i < len(cpu_usage[pid]) else ''
-    #         writer.writerow(row)
-
-    #     avg_row = {'Timestamp': 'Average'}
-    #     for pid in cpu_usage[pid]:
-    #         avg_row[f'Average_PID_{pid}'] = avg_cpu_usage[pid]
-    #     writer.writerow(avg_row)
-
-    # print(f"Average CPU usage written to {output_file}")
+    
     with open(cpu_usage_file, 'r') as f:
-        for line in f:
-            print(line)
+        data = f.read()
+
+    lines = data.split('\n')
+    process_names = ["com.facebook.en", "media.swcodec", "media.codec"]
+    process_cpu_usage = {}
+    pids = {}
+    for line in lines:
+        for process_name in process_names:
+            if process_name in line:
+                columns = re.sub(r'\x1B\[[0-9;]*[a-zA-Z]', '', line).strip().split()
+                for i, column in enumerate(columns):
+                    if column in ['S', 'R']:  # find the status column
+                        cpu_usage = float(columns[i + 1])  # extract the CPU usage value
+                        pid = int(columns[0])
+                        if pid not in pids:
+                            pids[pid] = []
+                       
+                        if process_name not in process_cpu_usage:
+                            process_cpu_usage[process_name] = []
+                        process_cpu_usage[process_name].append(cpu_usage)
+    return process_cpu_usage
 
 def list_codecs(serial, model, device_workdir, debug=0):
     model_clean = model.replace(" ", "_")
