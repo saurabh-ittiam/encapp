@@ -527,6 +527,7 @@ def file_exists_in_device(filename, serial, debug=False):
         cmd = f"idb file ls /Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
+        
         return len(output_files) > 0
 
 

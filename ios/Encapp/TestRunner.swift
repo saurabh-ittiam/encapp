@@ -100,26 +100,23 @@ class TestRunner: Thread {
                 } else {
                     //TODO: fix later, for now simple things
                     log.info("Start encoding test: \(test.common.id)")
-//                    let encoder = X264Encoder(test: test)
-//                    let result = try encoder.Encode()
-//                    statistics = encoder.statistics
                     
-                                        if test.configure.codec == "com.apple.videotoolbox.videoencoder.h264" {
-                                            // Use X264Encoder for HEVC codec
-                                            let encoder = X264Encoder(test: test)
-                                            let result = try encoder.Encode()
-                                            statistics = encoder.statistics
-                                            log.info("\(result)")
-                                            log.info("Done testing via h264: ")
-                                        } else {
-                                            // Use default Encoder for other codecs
-                                            let encoder = Encoder(test: test)
-                                            //let encoder = X264Encoder(test: test)
-                                            let result = try encoder.Encode()
-                                            statistics = encoder.statistics
-                                            log.info("\(result)")
-                                            log.info("Done testing via hardware: ")
-                                        }
+                    if test.configure.codec == "encoder.x264" {
+                        // Use X264Encoder for h264 codec
+                        let encoder = X264Encoder(test: test)
+                        let result = try encoder.Encode()
+                        statistics = encoder.statistics
+                        log.info("\(result)")
+                        log.info("Done testing via h264: ")
+                    }
+                    else {
+                        // Use default Encoder for other codecs
+                        let encoder = Encoder(test: test)
+                        let result = try encoder.Encode()
+                        statistics = encoder.statistics
+                        log.info("\(result)")
+                        log.info("Done testing via hardware: ")
+                    }
                     
                 }
                 
