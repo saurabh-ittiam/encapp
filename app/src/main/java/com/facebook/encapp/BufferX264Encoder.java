@@ -317,7 +317,11 @@ class BufferX264Encoder extends Encoder {
         }
 
         MediaFormat mediaFormat;
-        mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+        try {
+            mediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         logMediaFormat(mediaFormat);
         setConfigureParams(mTest, mediaFormat);
 

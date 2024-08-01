@@ -668,12 +668,15 @@ class BufferTranscoder extends Encoder {
                 Log.d(TAG, "encOutputExtractDone is true and getEncodedFrame() execution is over");
             }
         }
-        if (muxer != null) {
-            try {
-                muxer.release();
-            } catch (IllegalStateException ise) {
-                Log.e(TAG, "Illegal state exception when trying to release the muxer");
+        if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
+            if (muxer != null) {
+                try {
+                    muxer.release();
+                } catch (IllegalStateException ise) {
+                    Log.e(TAG, "Illegal state exception when trying to release the muxer");
+                }
             }
+            x264Close();
         }
         if (mDecodeDump) fo.close();
 
