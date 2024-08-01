@@ -100,7 +100,7 @@ public class SystemLoad {
         try {
             reader = new BufferedReader(new FileReader(realPath.toFile()));
             if (reader == null) {
-                Log.e(TAG, "failed to create reader");
+                Log.e(TAG, "failed to create GPU reader");
                 return "";
             }
 
@@ -111,7 +111,7 @@ public class SystemLoad {
                 value.append('\n');
             }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to read: " + path);
+            Log.e(TAG, "Failed to read GPU data: " + path);
             mCannotRead = true;
         } finally {
             if (reader != null) {

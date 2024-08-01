@@ -34,7 +34,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         print(f"Failed to run command: {cmd}")
         return False, "", ""
 
-    return ret, stdout.decode(), stderr.decode()
+    return ret, stdout.decode('latin-1'), stderr.decode('latin-1')
 
 
 def get_device_info(
@@ -181,7 +181,7 @@ def get_app_pid(serial: str, package_name: str, debug=0):
     ret, stdout, _ = run_cmd(adb_cmd, debug)
     if ret is True and stdout:
         try:
-            pid = int(stdout)
+            pid = int(stdout.split()[0])
         except ValueError:
             print(f'Unable to cast stdout: "{stdout}" to int')
             pid = -2
@@ -407,7 +407,7 @@ def parse_getprop(stdout: str) -> dict:
                 continue
             if not reading_val:
                 try:
-                    key, val = line.split(": ")
+                    key, val = line.split(": ", 1)
                     key = key.lstrip("[").rstrip("]")
                     val = val.lstrip("[")
                     if val[-1] == "]":
@@ -598,3 +598,4 @@ def set_idb_mode(mode):
 def is_using_idb():
     global USE_IDB
     return USE_IDB
+

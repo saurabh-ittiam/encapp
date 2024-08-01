@@ -616,8 +616,14 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] BufferDecode test");
                     coder = new BufferDecoder(test);
                 } else {
+                    //To reach transcode path "encode" parameter should configure as "true"
+                    if (!test.getConfigure().getSurface()) {
+                    Log.d(TAG, "[" + test.getCommon().getId() + "] BufferTranscoder test");
+                    coder = new BufferTranscoder(test);
+                } else {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceTranscoder test (alt)");
                     coder = new SurfaceTranscoder(test, new OutputMultiplier(mVsyncHandler), mVsyncHandler);
+                    }
                 }
             } else if (test.getConfigure().getSurface()) {
                 OutputMultiplier mult = null;
@@ -670,11 +676,14 @@ public class MainActivity extends AppCompatActivity {
         t = new Thread(new Runnable() {
             @Override
             public void run() {
+                String fullFilename="";
+                String status = "";
                 try {
                     Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
-                    final String status = coder.start();
+                    status = coder.start();
                     if (status.length() == 0) {
                         // test was ok
+                        status = "Test completed without error";
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "ok", "");
                     } else if (status.length() > 0) {
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "error", status);
@@ -689,9 +698,10 @@ public class MainActivity extends AppCompatActivity {
                 } finally {
                     // dump statistics
                     final Statistics stats = coder.getStatistics();
+                    fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + ".json";
                     stats.setAppVersion(getCurrentAppVersion());
+                    stats.setStatus(status);
                     try {
-                        String fullFilename = CliSettings.getWorkDir() + "/" + stats.getId() + ".json";
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, false);
                         stats.writeJSON(fw);

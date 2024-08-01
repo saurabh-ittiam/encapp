@@ -1,10 +1,12 @@
 package com.facebook.encapp.utils;
 
+import android.annotation.SuppressLint;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.util.Log;
 import android.os.SystemClock;
 
+import com.facebook.encapp.Encoder;
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
 
@@ -23,6 +25,7 @@ import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,6 +41,7 @@ public class Statistics {
     Date mStartDate;
     SystemLoad mLoad = new SystemLoad();
     private String mEncodedfile = "";
+    private String mStatus = "";
     private String mCodec;
     private long mStartTime = -1;
     private long mStopTime = -1;
@@ -48,7 +52,6 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
-
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -116,18 +119,19 @@ public class Statistics {
     );
 
     public Statistics(String desc, Test test) {
+//        Encoder coder = null;
         mDesc = desc;
         mEncodingFrames = new ArrayList<>(20);
         mDecodingFrames = new HashMap<>(20);
         mTest = test;
         mStartDate = new Date();
         mId = "encapp_" + UUID.randomUUID().toString();
+//        mId = "encapp_" + coder.getOutputFilename();
     }
 
     public void setAppVersion(String mAppVersion) {
         this.mAppVersion = mAppVersion;
     }
-
     public String getId() {
         return mId;
     }
@@ -258,7 +262,9 @@ public class Statistics {
     public void setEncodedfile(String filename) {
         mEncodedfile = filename;
     }
-
+    public void setStatus(String status) {
+        mStatus = status;
+    }
     public void setEncoderMediaFormat(MediaFormat format) {
         mEncoderMediaFormat = format;
     }
@@ -368,6 +374,7 @@ public class Statistics {
         return val;
     }
 
+    @SuppressLint("DefaultLocale")
     public void writeJSON(Writer writer) throws IOException {
         Log.d(TAG, "Write stats for " + mId);
         try {
@@ -406,6 +413,7 @@ public class Statistics {
                     json.put("decoder_hw_accelerated", mIsDecoderHw);
                 }
             }
+            json.put("Status msg:", mStatus );
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
@@ -440,7 +448,6 @@ public class Statistics {
                 jsonArray.put(obj);
             }
             json.put("frames", jsonArray);
-
             if (mDecodingFrames.size() > 0) {
 
                 allFrames = new ArrayList<>(mDecodingFrames.values());
@@ -474,6 +481,12 @@ public class Statistics {
                 }
                 json.put("decoded_frames", jsonArray);
             }
+
+            //CPU info
+            JSONObject cpuData = new JSONObject();
+            int cores = Runtime.getRuntime().availableProcessors();
+            cpuData.put("cores", String.valueOf(cores));
+            json.put("cpu_data", cpuData);
 
             // GPU info
             JSONObject gpuData = new JSONObject();

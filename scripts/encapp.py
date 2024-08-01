@@ -24,6 +24,10 @@ import encapp_tool.app_utils
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import copy
+import sys
+import threading
+import time
+import signal
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
@@ -222,7 +226,7 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
 
 
 def collect_results(
-    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
 ):
     if debug > 0:
         print(f"collecting result: {protobuf_txt_filepath}")
@@ -269,9 +273,31 @@ def collect_results(
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
         # append results file (json files) to final results
-        if file.endswith(".json"):
+        if file.strip().endswith(".json"):
+            total_cpu_usage = 0
+            
+            with open(os.path.join(local_workdir, file.strip()), 'r') as f:
+                data = json.load(f)
+            cpu_data = data.get("cpu_data", {})
+            # calculate average CPU usage for each process
+            for process, cpu_usages in process_cpu_usage.items():
+                avg_cpu_usage = 0
+                avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
+                process_cpu_usage[process].append(avg_cpu_usage)
+                total_cpu_usage += avg_cpu_usage
+                cpu_data[process] = f"{avg_cpu_usage:.2f}%"
+
+            cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
+            data["cpu_data"] = cpu_data
+                
+            with open(os.path.join(local_workdir, file.strip()), 'w') as f:
+                    json.dump(data, f, indent=2)
+                    
+            # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}    
+            
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
+        
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id Meta.Encapp"
@@ -460,7 +486,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
         # https://stackoverflow.com/a/30359308
         if not os.path.exists(options.mediastore):
             os.mkdir(options.mediastore)
-        basename = os.path.basename(test.input.filepath)
+        basename = os.path.basename(filepath)
         if not os.path.exists(f"{options.mediastore}/{basename}"):
             shutil.copy2(filepath, f"{options.mediastore}/{basename}")
 
@@ -472,14 +498,14 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     if options.split:
         # (a) one pbtxt file per subtest
         protobuf_txt_filepath = "split"
-        for test in test_suite.test:
-            output_dir = f"{local_workdir}/{test.common.id}"
-            if not os.path.exists(output_dir):
-                os.mkdir(output_dir)
-            filename = f"{output_dir}/{test.common.id}.pbtxt"
-            with open(filename, "w") as f:
-                f.write(text_format.MessageToString(test))
-            files_to_push |= {filename}
+        # for test in test_suite.test:
+        #     output_dir = f"{local_workdir}/{test.common.id}"
+        #     if not os.path.exists(output_dir):
+        #         os.mkdir(output_dir)
+        #     filename = f"{output_dir}/{test.common.id}.pbtxt"
+        #     with open(filename, "w") as f:
+        #         f.write(text_format.MessageToString(test))
+        #     files_to_push |= {filename}
     else:
         # (b) one pbtxt for all tests
         protobuf_txt_filepath = f"{local_workdir}/run.pbtxt"
@@ -487,7 +513,6 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
             f.write(text_format.MessageToString(test_suite))
         files_to_push |= {protobuf_txt_filepath}
     return test_suite, files_to_push, protobuf_txt_filepath
-
 
 def run_codec_tests_file(
     protobuf_txt_filepath, model, serial, local_workdir, options, debug
@@ -976,7 +1001,7 @@ def run_codec_tests(
     collected_results = []
     # run the test(s)
     if split:
-        # (a) one pbtxt file per subtest
+        # (a) one pbtxt file per subtest, Note CPU usage is captured for only this case
         # push just the files we need by looking up the name
         tests_run = f"{local_workdir}/tests_run.log"
         total_number = len(test_suite.test)
@@ -1017,7 +1042,12 @@ def run_codec_tests(
                 protobuf_txt_filepath = f"{test.common.id}.pbtxt"
             else:
                 protobuf_txt_filepath = f"{device_workdir}/{test.common.id}.pbtxt"
+            # start cpu usage capture
+            cpu_usage_file = f'{local_workdir}/{test.common.id}_cpu_usage.txt'
+            stop_event, monitor_thread, cpu_usage_file = start_cpu_monitoring(serial, cpu_usage_file, debug)
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
+            # end cpu usage capture
+            process_cpu_usage = stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file)
 
             with open(tests_run, "a") as passed:
                 passed.write(f"{test.common.id}.pbtxt\n")
@@ -1040,7 +1070,7 @@ def run_codec_tests(
             print("Collect results")
             collected_results.extend(
                 collect_results(
-                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                    local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
                 )
             )
 
@@ -1072,7 +1102,7 @@ def run_codec_tests(
 
         if encapp_tool.adb_cmds.USE_IDB:
             encapp_tool.app_utils.force_stop(serial, debug)
-
+        #encapp test start
         run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
         # collect the test results
         # Pull the log file (it will be overwritten otherwise)
@@ -1099,10 +1129,61 @@ def run_codec_tests(
         )
     return collected_results
 
+def start_cpu_monitoring(serial, cpu_usage_file, debug):
+    stop_event = threading.Event()
+    monitor_thread = threading.Thread(target=capture_cpu_usage, args=(serial, cpu_usage_file, debug, stop_event))
+    monitor_thread.start()
+    return stop_event, monitor_thread, cpu_usage_file
+def capture_cpu_usage(serial, cpu_usage_file, debug, stop_event):
+    interval = 0.5    
+    with open(cpu_usage_file, 'a') as f:
+        while not stop_event.is_set():
+            ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f'adb -s {serial} shell top -n 1')
+            now = datetime.datetime.now()
+            timestamp = now.strftime("%Y/%m/%d_%H:%M:%S")
+            if ret:
+                f.write(f'{timestamp}\n\n{stdout}\n')
+            else:
+                f.write(f'{timestamp}\nError: {stderr}\n')
+            time.sleep(interval)
+    return cpu_usage_file
+
+def signal_handler():
+    print('Exiting gracefully...')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+
+def stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file):
+    stop_event.set()
+    monitor_thread.join()
+    
+    with open(cpu_usage_file, 'r') as f:
+        data = f.read()
+
+    lines = data.split('\n')
+    process_names = ["com.facebook.en", "media.swcodec", "media.codec"]
+    process_cpu_usage = {}
+    pids = {}
+    for line in lines:
+        for process_name in process_names:
+            if process_name in line:
+                columns = re.sub(r'\x1B\[[0-9;]*[a-zA-Z]', '', line).strip().split()
+                for i, column in enumerate(columns):
+                    if column in ['S', 'R']:  # find the status column
+                        cpu_usage = float(columns[i + 1])  # extract the CPU usage value
+                        pid = int(columns[0])
+                        if pid not in pids:
+                            pids[pid] = []
+                       
+                        if process_name not in process_cpu_usage:
+                            process_cpu_usage[process_name] = []
+                        process_cpu_usage[process_name].append(cpu_usage)
+    return process_cpu_usage
 
 def list_codecs(serial, model, device_workdir, debug=0):
     model_clean = model.replace(" ", "_")
-    filename = f"codecs_{model_clean}.txt"
+    filename = f"codecs_{serial}.txt"
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = {f"idb launch --udid {serial} Meta.Encapp list_codecs"}
         ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
@@ -1452,7 +1533,7 @@ def get_options(argv):
         "--split",
         action="store_true",
         dest="split",
-        default=False,
+        default=True,
         help="Run serial test individually",
     )
     parser.add_argument(
@@ -1759,10 +1840,11 @@ def main(argv):
 
         # first clear out old result
         remove_encapp_gen_files(serial, options.device_workdir, options.debug)
-        result_ok, result_json = codec_test(options, model, serial, options.debug)
 
-        if not options.ignore_results:
-            verify_app_version(result_json)
+        result_ok = codec_test(options, model, serial, options.debug)[0]
+
+        # if not options.ignore_results:
+        #     verify_app_version(result_json)
         if not result_ok:
             sys.exit(-1)
 

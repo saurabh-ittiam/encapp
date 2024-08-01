@@ -206,6 +206,9 @@ class SurfaceEncoder extends Encoder {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
+        } catch(Exception e){
+            Log.e(TAG, "Unsupported profile or bitrate mode " + e.getMessage());
+            return "Failed to configure parameters";
         }
 
         try {
