@@ -56,6 +56,14 @@ class SurfaceEncoder extends Encoder {
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     private FrameswapControl mFrameSwapSurface;
 
+    static{
+        try {
+            System.loadLibrary("x264");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "Failed to load x264 library: " + e.getMessage());
+        }
+    }
+
     public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier) {
         super(test);
         mOutputMult = multiplier;
@@ -198,6 +206,9 @@ class SurfaceEncoder extends Encoder {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
+        } catch(Exception e){
+            Log.e(TAG, "Unsupported profile or bitrate mode " + e.getMessage());
+            return "Failed to configure parameters";
         }
 
         try {

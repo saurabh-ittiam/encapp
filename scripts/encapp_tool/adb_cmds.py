@@ -37,7 +37,7 @@ def run_cmd(cmd: str, debug: int = 0) -> typing.Tuple[bool, str, str]:
         print(f"Failed to run command: {cmd}")
         return False, "", ""
 
-    return ret, stdout.decode(), stderr.decode()
+    return ret, stdout.decode('latin-1'), stderr.decode('latin-1')
 
 
 def get_device_info(
@@ -437,7 +437,7 @@ def parse_getprop(stdout: str) -> dict:
                 continue
             if not reading_val:
                 try:
-                    key, val = line.split(": ")
+                    key, val = line.split(": ", 1)
                     key = key.lstrip("[").rstrip("]")
                     val = val.lstrip("[")
                     if val[-1] == "]":

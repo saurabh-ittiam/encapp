@@ -1,5 +1,6 @@
 package com.facebook.encapp;
 
+import static android.text.TextUtils.lastIndexOf;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
@@ -35,6 +36,8 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.List;
@@ -163,32 +166,35 @@ public abstract class Encoder {
     public boolean initDone() {
         return mInitDone;
     }
-
     protected MediaMuxer createMuxer(MediaCodec encoder, MediaFormat format, boolean useStatId) {
         if (!useStatId) {
             Log.d(TAG, "Bitrate mode: " + (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
-            mFilename = String.format(Locale.US, CliSettings.getWorkDir() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.mp4",
-                    encoder.getCodecInfo().getName().toLowerCase(Locale.US),
-                    (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
-                    (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
-                    (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
-                    (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
-                    (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
-                    (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+            mFilename = getOutputFilename() + ".mp4";
+//            mFilename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s.mp4",
+//                    Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+//                    codec_type,
+//                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
+//                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+//                    mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+//                    (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
+//                    mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+//                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
         } else {
             mFilename = mStats.getId() + ".mp4";
         }
         int type = MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4;
         if (encoder.getCodecInfo().getName().toLowerCase(Locale.US).contains("vp")) {
             if (!useStatId) {
-                mFilename = String.format(Locale.US, CliSettings.getWorkDir() + "/%s_%dfps_%dx%d_%dbps_iint%d_m%d.webm",
-                        encoder.getCodecInfo().getName().toLowerCase(Locale.US),
-                        (format.containsKey(MediaFormat.KEY_FRAME_RATE) ? format.getInteger(MediaFormat.KEY_FRAME_RATE) : 0),
-                        (format.containsKey(MediaFormat.KEY_WIDTH) ? format.getInteger(MediaFormat.KEY_WIDTH) : 0),
-                        (format.containsKey(MediaFormat.KEY_HEIGHT) ? format.getInteger(MediaFormat.KEY_HEIGHT) : 0),
-                        (format.containsKey(MediaFormat.KEY_BIT_RATE) ? format.getInteger(MediaFormat.KEY_BIT_RATE) : 0),
-                        (format.containsKey(MediaFormat.KEY_I_FRAME_INTERVAL) ? format.getInteger(MediaFormat.KEY_I_FRAME_INTERVAL) : 0),
-                        (format.containsKey(MediaFormat.KEY_BITRATE_MODE) ? format.getInteger(MediaFormat.KEY_BITRATE_MODE) : 0));
+                mFilename = getOutputFilename() + ".webm";
+//                mFilename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s.webm",
+//                        Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+//                        codec_type,
+//                        mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString() :
+//                                (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString() : "NA"),
+//                        mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+//                        (format.containsKey(MediaFormat.KEY_MAX_B_FRAMES) ? format.getInteger(MediaFormat.KEY_MAX_B_FRAMES) : 0),
+//                        mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+//                        mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0);
             } else {
                 mFilename = mStats.getId() + ".webm";
             }
@@ -211,7 +217,29 @@ public abstract class Encoder {
     }
 
     public String getOutputFilename() {
-        return mFilename;
+        if(mFilename != null) {
+            return (mFilename.lastIndexOf('.') > 0) ? mFilename.substring(0, mFilename.lastIndexOf('.')) : mFilename;
+        }else{
+            String codec_type = "hw";
+            //            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
+//                codec_type = mCodec.getCodecInfo().isHardwareAccelerated()
+//                        ? "hw"
+//                        : ((mCodec.getCodecInfo().isSoftwareOnly() || mCodec.getCodecInfo().getName().startsWith("OMX.google"))
+//                        ? "sw"
+//                        : codec_type);
+//            }
+            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s_%s",
+                    Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
+                    mTest.getConfigure().getCodec().toString().startsWith("c2.android") || mTest.getConfigure().getCodec().toString().startsWith("OMX.google.h264.encoder") ? "sw" : codec_type,
+                    mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString().toLowerCase() :
+                            (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString().toLowerCase() : "NA"),
+                    mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
+                    1,
+                    mTest.getConfigure().hasIFrameInterval() ? mTest.getConfigure().getIFrameInterval() : 0,
+                    mTest.getConfigure().hasBitrate() ? mTest.getConfigure().getBitrate().toString().replace(" ", "_") : 0,
+                    mTest.getConfigure().hasResolution() ? mTest.getConfigure().getResolution().toString() : 0);
+            return filename;
+        }
     }
 
     @NonNull
@@ -320,7 +348,7 @@ public abstract class Encoder {
         }
         // 4. stop the reader in non-loop mode:
         // stop when the file is empty
-       if ((!loop && fileReader != null) && fileReader.isClosed()) {
+        if ((!loop && fileReader != null) && fileReader.isClosed()) {
             return true;
         }
         // do not stop the reader
@@ -470,7 +498,7 @@ public abstract class Encoder {
         public void stopWriter() {
             mDone = true;
         }
-
+        //int framesWritten = 0;
 
         @Override
         public void run() {
@@ -495,7 +523,7 @@ public abstract class Encoder {
                         }
                         mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);
                         if (currentOutputFormat == null) {
-                           currentOutputFormat =  mCodec.getOutputFormat();
+                            currentOutputFormat =  mCodec.getOutputFormat();
                         }
                     } else {
                         if ((frameBuffer.mInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {

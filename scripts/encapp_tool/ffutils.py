@@ -32,7 +32,9 @@ def ffprobe_parse_output(stdout):
         if line in ("[STREAM]", "[/STREAM]"):
             # ignore start/end of stream
             continue
-        key, value = line.split("=")
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
         # store interesting fields
         if key in FFPROBE_FIELDS.keys():
             # process some values

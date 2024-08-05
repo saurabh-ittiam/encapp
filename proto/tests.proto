@@ -94,6 +94,20 @@ message Configure {
   optional int32 quality = 21;
   optional int32 complexity = 22;
   optional bool decode_dump = 23 [default = false];
+  enum AVCProfile {
+    constrainedBaseline = 65536;
+    baseline = 1;
+    main = 2;
+    high = 8;
+    constrainedHigh = 524288;
+  }
+  optional AVCProfile avc_profile = 24;
+  enum HEVCProfile {
+    Main = 1;
+    mainStill = 4;
+  }
+  optional HEVCProfile hevc_profile = 25;
+  optional string downscale_filter = 26 [default = "lanczos"];
 }
 
 message Runtime {
@@ -131,6 +145,14 @@ message Serial {
   repeated Test test = 1;
 }
 
+message EncoderX264 {
+  optional string preset = 1 [default = "medium"];
+  optional string colorSpace = 2 [default = "yuv420p"];
+  optional int32 bitdepth = 3 [default = 8];
+  optional string outputFile = 4 [default = "x264Output.mp4"];
+  optional int32 threads = 5 [default = 8];
+}
+
 message Test {
   optional Common common = 1;
   optional Input input = 2;
@@ -139,6 +161,7 @@ message Test {
   optional DecoderConfigure decoder_configure = 5;
   optional DecoderRuntime decoder_runtime = 6;
   optional Parallel parallel = 7;
+  optional EncoderX264 encoderX264 = 8;
 }
 
 message TestSuite {
