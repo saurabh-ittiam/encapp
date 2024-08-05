@@ -118,27 +118,28 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
         LOGI("Encoder is not initialized for encoding");
         return -1;
     }
+
     x264_picture_t pic_in = {0};
     x264_picture_t pic_out = {0};
 
     jclass x264FindIDRClass = env->GetObjectClass(x264FindIDRObj);
     jfieldID checkIDRFieldID = env->GetFieldID(x264FindIDRClass, "checkIDR", "Z");
-    jboolean checkIDR;
+    jboolean checkIDR = false;
 
     jsize yuvBuffer_size = env->GetArrayLength(yuvBuffer);
     jsize out_buffer_size = env->GetArrayLength(out_buffer);
 
     jbyte* yuvBuffer_data = env->GetByteArrayElements(yuvBuffer, NULL);
-    jbyte* out_YuvBuffer = env->GetByteArrayElements(out_buffer, NULL);
+    jbyte* out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
 
-    jint ySize, uvSize;
-    ySize = width * height;
+    jint ySize = width * height;
+    jint uvSize = 0;
 
     x264_picture_init(&pic_in);
 
     const char *cColorSpace = env->GetStringUTFChars(jColorSpace, NULL);
-    int colorSpace;
-    int num_planes;
+    int colorSpace = 0;
+    int num_planes = 0;
 
     if (strcmp(cColorSpace, "yuv420p") == 0) {
         colorSpace = X264_CSP_I420;
@@ -175,47 +176,44 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
-    int total_size = 0;
+    int total_size = 2;
+
     if (frame_size > 0) {
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type == NAL_SLICE_IDR) {
                 checkIDR = true;
-            } else {
-                checkIDR = false;
             }
             total_size += nal[i].i_payload;
         }
 
         if (out_buffer_size < total_size) {
+            env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
             out_buffer = env->NewByteArray(total_size);
+            out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
         }
 
         env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
-        jbyte *out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
 
-        int offset = 0;
+        int offset = 2;
         for (int i = 0; i < nnal; i++) {
-            if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS || nal[i].i_type == NAL_SEI ||
-                nal[i].i_type == NAL_AUD || nal[i].i_type == NAL_FILLER) {
-                continue;
+            if (nal[i].i_type != NAL_SPS && nal[i].i_type != NAL_PPS && nal[i].i_type != NAL_SEI &&
+                nal[i].i_type != NAL_AUD && nal[i].i_type != NAL_FILLER) {
+                memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
+                offset += nal[i].i_payload;
             }
-            memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
-            offset += nal[i].i_payload;
         }
-        env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
     }
 
     env->ReleaseByteArrayElements(yuvBuffer, yuvBuffer_data, 0);
-    env->ReleaseByteArrayElements(out_buffer, out_YuvBuffer, 0);
+    env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
 
     x264_picture_clean(&pic_in);
 
-    return (frame_size > 0) ? total_size: frame_size;
+    return (frame_size > 0) ? total_size : frame_size;
 }
 
 void X264Encoder::close()
 {
-    //x264_t *encoder = x264encoder->encoder;
     if (encoder) {
         x264_encoder_close(encoder);
         encoder = nullptr;
@@ -243,33 +241,33 @@ extern "C" {
     JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Init(JNIEnv *env, jobject thisObj,
                                                                                 jobject x264ConfigParamsObj, int width, int height,
                                                                                 jstring jColorSpace, int bitDepth, jbyteArray headerArray) {
-        return Java_com_facebook_encapp_common_x264Init(env, thisObj, x264ConfigParamsObj, width, height, jColorSpace, bitDepth, headerArray);
+        return X264Encoder::init(env, thisObj, x264ConfigParamsObj, width, height, jColorSpace, bitDepth, headerArray);
     }
 
     JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer,
                                                                                     jbyteArray outBuffer, jint width, jint height,
                                                                                     jstring jColorSpace, jobject x264FindIDRObj) {
-        return Java_com_facebook_encapp_common_x264Encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace, x264FindIDRObj);
+        return X264Encoder::getInstance().encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace, x264FindIDRObj);
     }
 
     JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferX264Encoder_x264Close(JNIEnv *env, jobject thisObj) {
-        Java_com_facebook_encapp_common_x264Close(env, thisObj);
+        X264Encoder::getInstance().close();
     }
 
     JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferTranscoder_x264Init(JNIEnv *env, jobject thisObj,
                                                                                 jobject x264ConfigParamsObj, int width, int height,
                                                                                 jstring jColorSpace, int bitDepth, jbyteArray headerArray) {
-        return Java_com_facebook_encapp_common_x264Init(env, thisObj, x264ConfigParamsObj, width, height, jColorSpace, bitDepth, headerArray);
+        return X264Encoder::init(env, thisObj, x264ConfigParamsObj, width, height, jColorSpace, bitDepth, headerArray);
     }
 
         JNIEXPORT jint JNICALL Java_com_facebook_encapp_BufferTranscoder_x264Encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer,
                                                                                         jbyteArray outBuffer, jint width, jint height,
                                                                                         jstring jColorSpace, jobject x264FindIDRObj) {
-            return Java_com_facebook_encapp_common_x264Encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace, x264FindIDRObj);
+        return X264Encoder::getInstance().encode(env, thisObj, yuvBuffer, outBuffer, width, height, jColorSpace, x264FindIDRObj);
     }
 
     JNIEXPORT void JNICALL Java_com_facebook_encapp_BufferTranscoder_x264Close(JNIEnv *env, jobject thisObj) {
-        Java_com_facebook_encapp_common_x264Close(env, thisObj);
+        X264Encoder::getInstance().close();
     }
 
 }

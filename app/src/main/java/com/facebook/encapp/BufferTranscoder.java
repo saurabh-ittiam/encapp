@@ -33,7 +33,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Dictionary;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 class BufferTranscoder extends Encoder {
     protected static final String TAG = "encapp.Buffer_transcoder";
@@ -944,8 +943,6 @@ class BufferTranscoder extends Encoder {
                     outputBuffer.get(yuvData);
                     int outWidth = outputFormat.getInteger(MediaFormat.KEY_WIDTH);
                     int outHeight = outputFormat.getInteger(MediaFormat.KEY_HEIGHT);
-                    //int colorFormat = outputFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT);
-                    //colourSpace = determinePixelFormat(colorFormat);
 
                     FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
                     frameInfo.addInfo(latestFrameChanges);
@@ -959,12 +956,9 @@ class BufferTranscoder extends Encoder {
                         //int frameSize = inpBitstreamFrWidth * inpBitstreamFrHeight * 3 / 2;
                         int frameSize = outWidth * outHeight * 3 / 2;
                         int encodedBufferSize;
-
                         byte[] encodedBuffer = new byte[frameSize];
-
                         byte[] yuvByteArray = extractYUVPlanes(yuvData, outWidth, outHeight, colourSpace);
 
-                        //String colourSpace = mTest.getEncoderX264().getColorSpace();
                         encodedBufferSize = x264Encode(yuvByteArray, encodedBuffer, outWidth, outHeight, colourSpace, findIDRInstance);
                         Log.d(TAG,"encodedBufferSize: " + encodedBufferSize);
 
