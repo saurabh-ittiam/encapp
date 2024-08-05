@@ -560,6 +560,12 @@ class BufferTranscoder extends Encoder {
         MediaCodec.BufferInfo bufferInfo = null;
         int videoTrackIndex = -1;
 
+        String outputStreamName = "x264_transcoder_output.h264";
+        String headerDump = "x264_transcoder_header_dump.h264";
+        File file = new File(Environment.getExternalStorageDirectory(), outputStreamName);
+        File file2 = new File(Environment.getExternalStorageDirectory(), headerDump);
+        FileOutputStream fileOutputStream = new FileOutputStream(file);
+        FileOutputStream fileOutputStream2 = new FileOutputStream(file2);
         Arrays.fill(headerArray, (byte) 0);
 
         String enable_x264_encoder = mTest.getConfigure().getCodec();
@@ -625,7 +631,15 @@ class BufferTranscoder extends Encoder {
                     direct_pred, slice_max_size, stats, nal_hrd, avcintra_class, me_method, motion_est, forced_idr, coder, b_strategy, chromaoffset, sc_threshold, noise_reduction, threads
             );
 
+            File parentDir = file.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+
             int sizeOfHeader = x264Init(x264ConfigParamsInstance, inpBitstreamFrWidth, inpBitstreamFrHeight, colorSpace, bitDepth, headerArray);
+            fileOutputStream2.write(headerArray, 0, sizeOfHeader);
+
             MuxerResult result = createMuxerX264(headerArray);
             muxer = result.getMuxer();
             bufferInfo = result.getBufferInfo();
@@ -652,7 +666,7 @@ class BufferTranscoder extends Encoder {
                 submitFrameForDecoding(trackIndex);
             }
             if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
-                getDecodedFrameAndSubmitForEncoding(headerArray, muxer, bufferInfo, videoTrackIndex);
+                getDecodedFrameAndSubmitForEncoding(headerArray, muxer, bufferInfo, videoTrackIndex, fileOutputStream);
             } else {
                 //Get decoded frames from output buffers & submit to encoder
                 if (!decOutputExtractDone) {
@@ -676,6 +690,8 @@ class BufferTranscoder extends Encoder {
                 }
             }
             x264Close();
+            fileOutputStream.close();
+            fileOutputStream2.close();
         }
         if (mDecodeDump) fo.close();
 
@@ -908,7 +924,7 @@ class BufferTranscoder extends Encoder {
     }
 
     void getDecodedFrameAndSubmitForEncoding(byte[] headerArray, MediaMuxer muxer,
-                                             MediaCodec.BufferInfo bufferInfo, int videoTrackIndex) throws IOException {
+                                             MediaCodec.BufferInfo bufferInfo, int videoTrackIndex, FileOutputStream fileOutputStream) throws IOException {
         int index;
         boolean checkIDR = false;
         findIDR findIDRInstance = new findIDR(checkIDR);
@@ -960,6 +976,7 @@ class BufferTranscoder extends Encoder {
                         byte[] yuvByteArray = extractYUVPlanes(yuvData, outWidth, outHeight, colourSpace);
 
                         encodedBufferSize = x264Encode(yuvByteArray, encodedBuffer, outWidth, outHeight, colourSpace, findIDRInstance);
+
                         Log.d(TAG,"encodedBufferSize: " + encodedBufferSize);
 
                         ByteBuffer buffer = ByteBuffer.wrap(encodedBuffer);
@@ -977,6 +994,7 @@ class BufferTranscoder extends Encoder {
                             buffer.limit(bufferInfo.offset + bufferInfo.size);
 
                             muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                            fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
                         }
                         framesWritten++;
                         encInpSubmitDone = true;

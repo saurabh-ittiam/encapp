@@ -74,6 +74,12 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     x264Params.i_csp = colorSpace;
     x264Params.i_bitdepth = bitDepth;
 
+
+    int val = X264_API x264_param_apply_profile(&x264Params, "main");
+    if(val  < 0)
+{
+        LOGI("Failed to set profile");
+}
     x264encoder->encoder = x264_encoder_open(&x264Params);
     x264_t *encoder = x264encoder->encoder;
     if(!encoder)
@@ -176,16 +182,20 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
-    int total_size = 2;
+    int total_size = 0;
 
     if (frame_size > 0) {
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type == NAL_SLICE_IDR) {
+LOGI("In IDR cond total_size JNI: %d", total_size);
                 checkIDR = true;
             }
             total_size += nal[i].i_payload;
+
         }
 
+        LOGI("After total_size JNI: %d", total_size);
+        LOGI("nnal : %d", nnal);
         if (out_buffer_size < total_size) {
             env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
             out_buffer = env->NewByteArray(total_size);
@@ -194,7 +204,7 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
         env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
 
-        int offset = 2;
+        int offset = 0;
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type != NAL_SPS && nal[i].i_type != NAL_PPS && nal[i].i_type != NAL_SEI &&
                 nal[i].i_type != NAL_AUD && nal[i].i_type != NAL_FILLER) {
@@ -202,6 +212,7 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
                 offset += nal[i].i_payload;
             }
         }
+LOGI("After offset JNI: %d", offset);
     }
 
     env->ReleaseByteArrayElements(yuvBuffer, yuvBuffer_data, 0);

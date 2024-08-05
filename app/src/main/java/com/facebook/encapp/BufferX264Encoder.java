@@ -339,7 +339,20 @@ class BufferX264Encoder extends Encoder {
             }
         }
 
+        String outputStreamName = "x264_encoder_output.h264";
+        String headerDump = "x264_encoder_header_dump.h264";
+        File file = new File(Environment.getExternalStorageDirectory(), outputStreamName);
+        File file2 = new File(Environment.getExternalStorageDirectory(), headerDump);
+
+        // Ensure the parent directory exists
+        File parentDir = file.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
         try {
+            FileOutputStream fileOutputStream = new FileOutputStream(file);
+            FileOutputStream fileOutputStream2 = new FileOutputStream(file2);
 
             int currentFramePosition = 0;
             boolean input_done = false;
@@ -440,7 +453,11 @@ class BufferX264Encoder extends Encoder {
                         buffer.limit(bufferInfo.offset + bufferInfo.size);
 
                         muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
+                        if(flagHeaderSize)
+                            fileOutputStream2.write(headerArray, 0, sizeOfHeader);
+                        fileOutputStream.write(buffer.array(), 0, outputBufferSize);
                     }
+                    flagHeaderSize = false;
                 } catch (MediaCodec.CodecException ex) {
                     Log.e(TAG, "dequeueOutputBuffer: MediaCodec.CodecException error");
                     ex.printStackTrace();
@@ -451,6 +468,8 @@ class BufferX264Encoder extends Encoder {
 
             Log.d(TAG, "Close encoder and streams");
             x264Close();
+            fileOutputStream.close();
+            fileOutputStream2.close();
 
             if (muxer != null) {
                 try {
