@@ -7,8 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3A2235602C5B536B00602D94 /* Bicubic_Resize.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3A22355F2C5B536B00602D94 /* Bicubic_Resize.cpp */; };
+		3A2235632C5B53E900602D94 /* itt_scaler.c in Sources */ = {isa = PBXBuildFile; fileRef = 3A2235622C5B53E900602D94 /* itt_scaler.c */; };
+		3AACEDDF2C5B5A7A0018F113 /* DownScaler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3AACEDDE2C5B5A7A0018F113 /* DownScaler.cpp */; };
 		3ABA519E2C46A4F60013372F /* X264Wrapper.m in Sources */ = {isa = PBXBuildFile; fileRef = 3ABA519D2C46A4F60013372F /* X264Wrapper.m */; };
 		3ABA51A02C46A50B0013372F /* X264Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ABA519F2C46A50B0013372F /* X264Encoder.swift */; };
+		3ACE2D9C2C58B86F0061F8C3 /* Transcoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACE2D9B2C58B86F0061F8C3 /* Transcoder.swift */; };
 		3AD568992C4A748A00CCCEBD /* libx264.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AD568982C4A747600CCCEBD /* libx264.a */; };
 		CA53D6F729689DB200485E4D /* Decoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA53D6F629689DB200485E4D /* Decoder.swift */; };
 		CA8256F6293E7BEB0082B2BE /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CA8256F5293E7BEB0082B2BE /* SwiftProtobuf */; };
@@ -60,14 +64,20 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3A22355F2C5B536B00602D94 /* Bicubic_Resize.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Bicubic_Resize.cpp; sourceTree = "<group>"; };
+		3A2235612C5B53C300602D94 /* itt_scaler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = itt_scaler.h; sourceTree = "<group>"; };
+		3A2235622C5B53E900602D94 /* itt_scaler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = itt_scaler.c; sourceTree = "<group>"; };
 		3A38D9DA2C46A0970066C1E2 /* config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
 		3A38D9DC2C46A0970066C1E2 /* x264.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264.h; sourceTree = "<group>"; };
 		3A38D9DD2C46A0970066C1E2 /* x264_config.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264_config.h; sourceTree = "<group>"; };
 		3A38D9DE2C46A0970066C1E2 /* x264cli.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = x264cli.h; sourceTree = "<group>"; };
+		3AACEDDD2C5B5A660018F113 /* DownScaler.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = DownScaler.hpp; sourceTree = "<group>"; };
+		3AACEDDE2C5B5A7A0018F113 /* DownScaler.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DownScaler.cpp; sourceTree = "<group>"; };
 		3ABA519C2C46A4D90013372F /* X264Wrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X264Wrapper.h; sourceTree = "<group>"; };
 		3ABA519D2C46A4F60013372F /* X264Wrapper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = X264Wrapper.m; sourceTree = "<group>"; };
 		3ABA519F2C46A50B0013372F /* X264Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X264Encoder.swift; sourceTree = "<group>"; };
 		3ABA51A12C46A57F0013372F /* Encapp-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Encapp-Bridging-Header.h"; sourceTree = "<group>"; };
+		3ACE2D9B2C58B86F0061F8C3 /* Transcoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Transcoder.swift; sourceTree = "<group>"; };
 		3AD568982C4A747600CCCEBD /* libx264.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libx264.a; sourceTree = "<group>"; };
 		CA53D6F629689DB200485E4D /* Decoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decoder.swift; sourceTree = "<group>"; };
 		CAAB92C2292D2ABB009009B2 /* Encapp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Encapp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -156,6 +166,9 @@
 		CAAB92C4292D2ABB009009B2 /* Encapp */ = {
 			isa = PBXGroup;
 			children = (
+				3AACEDDE2C5B5A7A0018F113 /* DownScaler.cpp */,
+				3AACEDDD2C5B5A660018F113 /* DownScaler.hpp */,
+				3ACE2D9B2C58B86F0061F8C3 /* Transcoder.swift */,
 				CAAB930529391082009009B2 /* utils */,
 				CAAB92F5292D2B88009009B2 /* tests.pb.swift */,
 				CAAB930F29395655009009B2 /* TestRunner.swift */,
@@ -171,6 +184,9 @@
 				3ABA519D2C46A4F60013372F /* X264Wrapper.m */,
 				3ABA519F2C46A50B0013372F /* X264Encoder.swift */,
 				3ABA51A12C46A57F0013372F /* Encapp-Bridging-Header.h */,
+				3A22355F2C5B536B00602D94 /* Bicubic_Resize.cpp */,
+				3A2235612C5B53C300602D94 /* itt_scaler.h */,
+				3A2235622C5B53E900602D94 /* itt_scaler.c */,
 			);
 			path = Encapp;
 			sourceTree = "<group>";
@@ -349,7 +365,10 @@
 				CAAB9303292E92EC009009B2 /* Utils.swift in Sources */,
 				CAAB92FD292D7A44009009B2 /* FileHandling.swift in Sources */,
 				CAAB92C6292D2ABB009009B2 /* EncappApp.swift in Sources */,
+				3A2235602C5B536B00602D94 /* Bicubic_Resize.cpp in Sources */,
 				CAAB931029395655009009B2 /* TestRunner.swift in Sources */,
+				3A2235632C5B53E900602D94 /* itt_scaler.c in Sources */,
+				3ACE2D9C2C58B86F0061F8C3 /* Transcoder.swift in Sources */,
 				3ABA51A02C46A50B0013372F /* X264Encoder.swift in Sources */,
 				CAAB9307293910D9009009B2 /* Statistics.swift in Sources */,
 				CAAB92F6292D2B89009009B2 /* tests.pb.swift in Sources */,
@@ -357,6 +376,7 @@
 				3ABA519E2C46A4F60013372F /* X264Wrapper.m in Sources */,
 				CA53D6F729689DB200485E4D /* Decoder.swift in Sources */,
 				CAAB930D29392CC8009009B2 /* JsonStats.swift in Sources */,
+				3AACEDDF2C5B5A7A0018F113 /* DownScaler.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

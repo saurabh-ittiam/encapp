@@ -3,4 +3,118 @@
    uuid = "01DEC266-D369-425B-AA2B-124FA8F41DF1"
    type = "1"
    version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "423270F5-11B8-42A0-A709-412F08A6283F"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Encapp/Transcoder.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "220"
+            endingLineNumber = "220"
+            landmarkName = "processFrames()"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "423270F5-11B8-42A0-A709-412F08A6283F - 4001671aaaba0bad"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Encapp.Transcoder.processFrames() -&gt; ()"
+                  moduleName = "Encapp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/ittiam/encapp/ios/Encapp/Transcoder.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "221"
+                  endingLineNumber = "221"
+                  offsetFromSymbolStart = "2400">
+               </Location>
+               <Location
+                  uuid = "423270F5-11B8-42A0-A709-412F08A6283F - 4001671aaaba0b8c"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Encapp.Transcoder.processFrames() -&gt; ()"
+                  moduleName = "Encapp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/ittiam/encapp/ios/Encapp/Transcoder.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "220"
+                  endingLineNumber = "220"
+                  offsetFromSymbolStart = "2400">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "64F496E1-5010-4830-AD2C-71E8EBA94507"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Encapp/Transcoder.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "303"
+            endingLineNumber = "303"
+            landmarkName = "processFrames()"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "64F496E1-5010-4830-AD2C-71E8EBA94507 - 4001671aaaba053f"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Encapp.Transcoder.processFrames() -&gt; ()"
+                  moduleName = "Encapp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/ittiam/encapp/ios/Encapp/Transcoder.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "303"
+                  endingLineNumber = "303"
+                  offsetFromSymbolStart = "16196">
+               </Location>
+               <Location
+                  uuid = "64F496E1-5010-4830-AD2C-71E8EBA94507 - 4001671aaaba0558"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "Encapp.Transcoder.processFrames() -&gt; ()"
+                  moduleName = "Encapp"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/ittiam/encapp/ios/Encapp/Transcoder.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "304"
+                  endingLineNumber = "304"
+                  offsetFromSymbolStart = "16200">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "BB9D02D3-A772-4378-B3F3-2E155C757C53"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Encapp/X264Wrapper.m"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "39"
+            endingLineNumber = "39"
+            landmarkName = "-initWithGeneralConfig:preset:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
 </Bucket>

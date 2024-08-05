@@ -95,6 +95,17 @@ class TestRunner: Thread {
                     let decoder = Decoder(test: test)
                     let result = try decoder.Decode()
                     statistics = decoder.statistics
+                    if (test.configure.encode) {
+                        print("Transcode video")
+                        let transcoder = Transcoder(test: test)
+                        let result = try transcoder.Transcode()
+                        statistics = transcoder.statistics
+                    } else {
+                        print("Decode video")
+                        let decoder = Decoder(test: test)
+                        let result = try decoder.Decode()
+                        statistics = decoder.statistics
+                    }
                 } else if test.input.filepath.fileExtension() == "camera" {
                     print("Camera source")
                 } else {

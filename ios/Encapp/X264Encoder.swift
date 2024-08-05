@@ -57,7 +57,7 @@ class X264Encoder {
         let colorspace = definition.encoderX264.colorSpace
         let bitDepth = definition.encoderX264.bitdepth
         let threads = definition.encoderX264.threads
-        
+        log.error("no of threads= \(threads)")
         generalConfig.i_width = width
         generalConfig.i_height = height
         generalConfig.i_bitdepth = bitDepth
@@ -151,7 +151,7 @@ class X264Encoder {
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
-            // Other settings as needed
+           
         ]
         outputSettings = videoSettings
         
@@ -301,7 +301,6 @@ class X264Encoder {
         result.flags = threadInfo[7]
         result.suspend_count = threadInfo[8]
         result.sleep_time = threadInfo[9]
-        
         return result
     }
     

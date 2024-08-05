@@ -14,6 +14,8 @@
         x264_param_t params;
         x264_param_default(&params);
         
+    
+        
         
         
         // Convert NSString to C-string for x264_param_default_preset
@@ -23,6 +25,7 @@
             NSLog(@"Failed to set preset: %s", presetCStr);
             return nil;
         }
+  
         
         // Mapping generalConfig to x264Params
         params.i_threads = generalConfig.i_threads;
@@ -30,6 +33,18 @@
         params.i_height = generalConfig.i_height;
         params.i_csp = X264_CSP_I420;
         params.i_bitdepth = generalConfig.i_bitdepth;
+        
+        
+        
+        int result = x264_param_apply_profile(&params, "high");
+
+            if (result < 0) {
+                NSLog(@"Failed to apply profile\n");
+                return nil;
+            }
+            else{
+                NSLog(@" profile set \n");
+            }
         
         
         // Open the x264 encoder
