@@ -5,12 +5,78 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:keepScreenOn="true"
-    tools:context="com.facebook.encapp.MainActivity"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    tools:context="com.facebook.encapp.MainActivity">
 
     <TableLayout
         android:id="@+id/viewTable"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content">
     </TableLayout>
+
+    <!-- New UI Elements for Battery Monitoring -->
+    <Button
+        android:id="@+id/selectFileButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select .pbtxt File"
+        android:layout_marginTop="16dp" />
+
+    <TextView
+        android:id="@+id/selectedFileTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="No file selected" />
+
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Start" />
+
+    <Button
+        android:id="@+id/stopButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Stop" />
+
+    <Button
+        android:id="@+id/resetButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Reset" />
+
+    <TextView
+        android:id="@+id/startBatteryTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Before batteryInMicroAmps: " />
+
+    <TextView
+        android:id="@+id/endBatteryTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="After batteryInMicroAmps: " />
+
+    <TextView
+        android:id="@+id/batteryStatsTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Battery Stats: " />
+
+    <TextView
+        android:id="@+id/testStatusTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:layout_below="@id/startButton"
+        android:layout_marginTop="16dp"/>
+
 </LinearLayout>
