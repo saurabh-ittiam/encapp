@@ -447,7 +447,19 @@ class BufferTranscoder extends Encoder {
         mStats.start();
         try {
             // start bufferTranscoding
-            bufferTranscoding(trackNum);
+            long startTime = System.currentTimeMillis();
+            long durationMs = 2 * 60 * 1000; // 30 minutes
+
+            while (System.currentTimeMillis() - startTime < durationMs) {
+                //mExtractor.setDataSource(mTest.getInput().getFilepath());
+                //trackNum = mExtractor.getTrackCount();
+                mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                mExtractor.selectTrack(trackNum);
+
+                bufferTranscoding(trackNum);
+
+
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -556,6 +568,7 @@ class BufferTranscoder extends Encoder {
             fo = new FileOutputStream(file);
         }
 
+        int orgTrackIndex = trackIndex;
         int estimatedSize = 1024;
         byte[] headerArray = new byte[estimatedSize];
         MediaMuxer muxer = null;
@@ -692,6 +705,8 @@ class BufferTranscoder extends Encoder {
             if(encOutputExtractDone){
                 Log.d(TAG, "encOutputExtractDone is true and getEncodedFrame() execution is over");
             }
+            //if(trackIndex == (orgTrackIndex - 1))
+            //    trackIndex = 0;
         }
         if(isx264Encoder) {
             if (muxer != null) {
@@ -1119,19 +1134,19 @@ class BufferTranscoder extends Encoder {
                                 wait(WAIT_TIME_SHORT_MS);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
+                                }
                             }
-                        }
-                        encInpSubmitDone = true;
-                        Log.d(TAG, "Submitted EOF for encoder ");
+                            encInpSubmitDone = true;
+                            Log.d(TAG, "Submitted EOF for encoder ");
                         Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
-                                " submitted frame for enc: " + mInFramesCount);
-                    }
+                                    " submitted frame for enc: " + mInFramesCount);
+                        }
                 }else {
-                    Log.d(TAG, "encInpBuffer is null");
-                }
+                        Log.d(TAG, "encInpBuffer is null");
+                    }
 
-            } else {
-                Log.d(TAG, "index value: " + index);
+                } else {
+                    Log.d(TAG, "index value: " + index);
             }
         }
     }
