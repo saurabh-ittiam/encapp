@@ -182,7 +182,7 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
-    int total_size = 0;
+    int total_size = 2;
 
     if (frame_size > 0) {
         for (int i = 0; i < nnal; i++) {
@@ -204,7 +204,7 @@ LOGI("In IDR cond total_size JNI: %d", total_size);
 
         env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
 
-        int offset = 0;
+        int offset = 2;
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type != NAL_SPS && nal[i].i_type != NAL_PPS && nal[i].i_type != NAL_SEI &&
                 nal[i].i_type != NAL_AUD && nal[i].i_type != NAL_FILLER) {
