@@ -151,7 +151,7 @@ class X264Encoder {
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
-           
+            
         ]
         outputSettings = videoSettings
         
@@ -363,7 +363,7 @@ class X264Encoder {
         
         outputWriterInput.append(sampleBuffer)
     }
-    			
+    
     func readNextFrame(yuvFileHandle: FileHandle, ySize: Int, uvSize: Int) -> (UnsafeMutablePointer<UInt8>, UnsafeMutablePointer<UInt8>, UnsafeMutablePointer<UInt8>)? {
         let yData = yuvFileHandle.readData(ofLength: ySize)
         let uData = yuvFileHandle.readData(ofLength: uvSize)

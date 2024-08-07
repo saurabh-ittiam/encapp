@@ -43,7 +43,7 @@ class Transcoder {
     var inputFrameRate = -1 as Float
     var outputFrameRate = -1 as Float
     var muxfps = 0 as Float
-    
+    var processFramesCounter: Int = 0
     
     var frameBuffer: [(presentationTimeStamp: CMTime, imageBuffer: CVPixelBuffer)] = []
     var shouldProcess = false
@@ -51,9 +51,6 @@ class Transcoder {
     init(test: Test){
         self.definition = test
     }
-    
-    
-    
     func Transcode() throws -> String {
         statistics = Statistics(description: "transcoder", test: definition)
         if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
@@ -82,8 +79,6 @@ class Transcoder {
             }
             semaphore.wait()
             
-            
-            
             log.info("Continue")
             inputReader?.add(trackOutput)
             inputReader?.startReading()
@@ -110,8 +105,6 @@ class Transcoder {
                 
                 self.processFrames()
             }
-            
-            
             
             var frameNum = 0 as UInt32
             var inputFrameCounter = 0
@@ -161,8 +154,10 @@ class Transcoder {
                     inputDone = true
                 }
             }
-            
-            
+            while !self.frameBuffer.isEmpty{
+                processFrames()
+                processFrames()
+            }
             statistics.stop()
             // Flush
             let framePts = computePresentationTimeUsec(frameIndex: inputFrameCounter, frameTimeUsec: inputFrameDurationUsec, offset: Int64(pts))
@@ -189,11 +184,10 @@ class Transcoder {
     }
     
     
-    
-    
-    
     private func processFrames() {
         
+        processFramesCounter += 1
+        log.info("Frames Encoded : \(processFramesCounter) ")
         
         while !self.frameBuffer.isEmpty {
             let firstFrame = self.frameBuffer.first!
@@ -246,8 +240,12 @@ class Transcoder {
                 
                 var downscaledBuffer: CVPixelBuffer? = nil
                 let resolution = splitX(text: definition.input.resolution)
-                let downscaleWidth = Int32((resolution[0] >> 1) << 1)
-                let downscaleHeight = Int32((resolution[1] >> 1) << 1)
+                let width = resolution[0]
+                let height = resolution[1]
+                var downscaleWidth = (width >> 1) << 1 // Ensure width is even
+                var downscaleHeight = (height >> 1) << 1 // Ensure height is even
+                
+                
                 
                 var pixelBufferAttributes: [String: Any] = [
                     kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
@@ -267,36 +265,51 @@ class Transcoder {
                     return
                 }
                 
-                var inpBuffer: [UnsafeMutableRawPointer?] = [nil, nil]
-                var outBuffer: [UnsafeMutableRawPointer?] = [nil, nil]
-                var inpFrameStride: [Int32] = [0, 0]
-                var outFrameStride: [Int32] = [0, 0]
+                // Reading input buffers row-wise and storing in arrays
+                let inpBuffer_Y = CVPixelBufferGetBaseAddressOfPlane(firstFrame.imageBuffer, 0)!
+                let inpStride_Y = CVPixelBufferGetBytesPerRowOfPlane(firstFrame.imageBuffer, 0)
+                let height_Y = CVPixelBufferGetHeightOfPlane(firstFrame.imageBuffer, 0)
+                let width_Y = CVPixelBufferGetWidthOfPlane(firstFrame.imageBuffer, 0)
                 
-                for i in 0..<2 {
-                    inpBuffer[i] = CVPixelBufferGetBaseAddressOfPlane(firstFrame.imageBuffer, i)
-                    outBuffer[i] = CVPixelBufferGetBaseAddressOfPlane(downscaledBuffer!, i)
-                    inpFrameStride[i] = Int32(CVPixelBufferGetBytesPerRowOfPlane(firstFrame.imageBuffer, i))
-                    outFrameStride[i] = Int32(CVPixelBufferGetBytesPerRowOfPlane(downscaledBuffer!, i))
-                }
+                let inpBuffer_UV = CVPixelBufferGetBaseAddressOfPlane(firstFrame.imageBuffer, 1)!
+                let inpStride_UV = CVPixelBufferGetBytesPerRowOfPlane(firstFrame.imageBuffer, 1)
+                let height_UV = CVPixelBufferGetHeightOfPlane(firstFrame.imageBuffer, 1)
+                let width_UV = CVPixelBufferGetWidthOfPlane(firstFrame.imageBuffer, 1)
+                
+                let outBuffer_Y = CVPixelBufferGetBaseAddressOfPlane(downscaledBuffer!, 0)!
+                let outStride_Y = CVPixelBufferGetBytesPerRowOfPlane(downscaledBuffer!, 0)
+                let outBuffer_UV = CVPixelBufferGetBaseAddressOfPlane(downscaledBuffer!, 1)!
+                let outStride_UV = CVPixelBufferGetBytesPerRowOfPlane(downscaledBuffer!, 1)
+                
+                let inpFrameStride_Y = inpStride_Y
+                let inpFrameStride_UV = inpStride_UV
+                
+                let outFrameStride_Y = outStride_Y
+                let outFrameStride_UV = outStride_UV
+                
+                
+                let outBuffer: [UnsafeMutableRawPointer?] = [outBuffer_Y, outBuffer_UV]
+                //let inpFrameStride: [Int32] = [Int32(inpFrameStride_Y), Int32(inpFrameStride_UV)]
+                let outFrameStride: [Int32] = [Int32(outFrameStride_Y), Int32(outFrameStride_UV)]
                 
                 let inpPixelFormat: Int32 = 21
                 let outPixelFormat: Int32 = inpPixelFormat
                 
-                let width = Int32(CVPixelBufferGetWidth(firstFrame.imageBuffer))
-                let height = Int32(CVPixelBufferGetHeight(firstFrame.imageBuffer))
-                
-                let downscaleFlag = "Lanczos"
+                let downscaleFlag = "bicubic"
                 let downscaleFlagCString = downscaleFlag.cString(using: .utf8)!
                 
                 // Perform downscaling to the downscaled buffer
-                DownScaler(inpBuffer[0], inpBuffer[1], nil,
-                           outBuffer[0], outBuffer[1], nil,
-                           width, height,
-                           inpFrameStride[0], inpFrameStride[1],
-                           downscaleWidth, downscaleHeight,
-                           outFrameStride[0], outFrameStride[1],
-                           inpPixelFormat, outPixelFormat,
-                           downscaleFlagCString)
+                DownScaler(
+                    inpBuffer_Y, inpBuffer_UV, nil,
+                    outBuffer[0], outBuffer[1], nil,
+                    Int32(width_Y), Int32(height_Y),
+                    Int32(inpStride_Y), Int32(inpStride_UV),
+                    Int32(downscaleWidth), Int32(downscaleHeight),
+                    outFrameStride[0], outFrameStride[1],
+                    inpPixelFormat, outPixelFormat,
+                    downscaleFlagCString
+                )
+                
                 
                 CVPixelBufferUnlockBaseAddress(downscaledBuffer!, CVPixelBufferLockFlags(rawValue: 0))
                 CVPixelBufferUnlockBaseAddress(firstFrame.imageBuffer, CVPixelBufferLockFlags(rawValue: 0))
@@ -315,7 +328,8 @@ class Transcoder {
                 
                 self.frameBuffer.removeFirst()
                 break
-            } else {
+            }
+            else {
                 break
             }
         }

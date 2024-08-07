@@ -56,7 +56,7 @@ int DownScaler(void* y_plane, void* u_plane, void* v_plane,
         
         u_plane = p_inp_cb_plane_local;
         v_plane = p_inp_cr_plane_local;
-        inp_y_stride = inp_frame_width;
+        //inp_y_stride = inp_frame_width;
         inp_uv_stride = inp_frame_width >> 1;
     }
     
