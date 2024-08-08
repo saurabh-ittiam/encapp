@@ -1,5 +1,6 @@
 package com.facebook.encapp;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -10,10 +11,13 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.Process;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.Size;
@@ -21,11 +25,14 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.widget.Button;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -37,22 +44,27 @@ import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.MemoryLoad;
 import com.facebook.encapp.utils.OutputMultiplier;
+import com.facebook.encapp.utils.ParsedData;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.VsyncHandler;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 import com.google.protobuf.TextFormat;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
@@ -80,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
     public static boolean isStable() {
         return mStable;
     }
+
+    private List<String> mp4Files = new ArrayList<>();
 
     public static String getFilenameExtension(String filename) {
         int last_dot_location = filename.lastIndexOf('.');
@@ -126,6 +140,21 @@ public class MainActivity extends AppCompatActivity {
         return currentVersion;
     }
 
+    private Test createTestFromParsedData(ParsedData parsedData) {
+        Test.Builder testBuilder = Test.newBuilder();
+        // Populate Test fields based on ParsedData
+        testBuilder.getCommonBuilder().setId(parsedData.getId());
+        testBuilder.getCommonBuilder().setDescription(parsedData.getDescription());
+        testBuilder.getInputBuilder().setFilepath(parsedData.getFilepath());
+        testBuilder.getInputBuilder().setRealtime(parsedData.isRealtime());
+        testBuilder.getInputBuilder().setShow(parsedData.isShow());
+        testBuilder.getConfigureBuilder().setCodec(parsedData.getCodec());
+        testBuilder.getConfigureBuilder().setEncode(parsedData.isEncode());
+        testBuilder.getConfigureBuilder().setBitrate(parsedData.getBitrate());
+        return testBuilder.build();
+    }
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -133,6 +162,22 @@ public class MainActivity extends AppCompatActivity {
         mVsyncHandler.start();
         //setContentView(R.layout.activity_main);
         setContentView(R.layout.activity_visualize);
+        final AtomicReference<ParsedData> parsedDataRef = new AtomicReference<>(null);
+
+        // Initialize battery-related UI elements
+        TextView startBatteryTextView = findViewById(R.id.startBatteryTextView);
+        TextView endBatteryTextView = findViewById(R.id.endBatteryTextView);
+        TextView batteryStatsTextView = findViewById(R.id.batteryStatsTextView);
+        Button startButton = findViewById(R.id.startButton);
+        Button selectFileButton = findViewById(R.id.selectFileButton);
+        Button stopButton = findViewById(R.id.stopButton);
+        Button resetButton = findViewById(R.id.resetButton);
+        TextView selectedFileTextView = findViewById(R.id.selectedFileTextView);
+        TextView testStatusTextView = findViewById(R.id.testStatusTextView);
+
+        // Initialize battery monitoring variables
+        final int[] startbatteryInMicroAmps = {-1};
+        final int[] endbatteryInMicroAmps = {-1};
 
         // get list of non-granted permissions
         String[] permissions = retrieveNotGrantedPermissions(this);
@@ -175,20 +220,228 @@ public class MainActivity extends AppCompatActivity {
         mTable = findViewById(R.id.viewTable);
 
         Log.d(TAG, "Passed all permission checks");
-        if (getTestSettings()) {
-            (new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    performAllTests();
-                    Log.d(TAG, "***** All tests are done, over and out *****");
-                    exit();
+
+        // Battery monitoring logic
+        ActivityResultLauncher<Intent> selectFileLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        Uri uri = result.getData().getData();
+                        String path = getFilePathFromUri(uri);
+                        selectedFileTextView.setText(path);
+                        ParsedData parsedData = parsePbtxtFile(path);
+                        parsedDataRef.set(parsedData);
+                    }
                 }
-            })).start();
-        } else {
-            listCodecs();
+        );
+
+        selectFileButton.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            selectFileLauncher.launch(intent);
+        });
+
+        startButton.setOnClickListener(v -> {
+                    ParsedData parsedData = parsedDataRef.get();
+                    if (parsedData == null) {
+                        Toast.makeText(this, "No file selected or parsed.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    startbatteryInMicroAmps[0] = getChargeCounter();
+                    startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
+                    testStatusTextView.setText("Test is running...");
+
+                    Test test = createTestFromParsedData(parsedData);
+                    PerformTest(test);
+
+                    //if (!mp4Files.isEmpty()) {
+                    //    for (String mp4FilePath : mp4Files) {
+                    //        Test.Builder testBuilder = Test.newBuilder();
+                    //        testBuilder.getInputBuilder().setFilepath(mp4FilePath);
+                    //test = createTestFromParsedData(parsedData);
+                    //PerformTest(test);
+                    //    }
+                    //} else {
+                    if (getTestSettings()) {
+                        (new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                performAllTests();
+                                Log.d(TAG, "***** All tests are done, over and out *****");
+
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
+                                        batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+                                        testStatusTextView.setText("Test completed.");
+                                    }
+                                });
+
+                                saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+                                exit();
+                            }
+                        })).start();
+                    } else {
+                        listCodecs();
+                    }
+                    //}
+                    new Handler().postDelayed(() -> {
+                        runOnUiThread(() -> {
+                            endbatteryInMicroAmps[0] = getChargeCounter();
+                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
+                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+                            testStatusTextView.setText("Test completed.");
+                        });
+
+                        saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+
+                    }, /*30 * 60 */ 1 * 60 * 1000); // 30 minutes in milliseconds
+
+                });
+            stopButton.setOnClickListener(v -> {
+                // Implement logic to stop the test
+                // This may involve interrupting the thread performing the tests
+                testStatusTextView.setText("Test stopped.");
+            });
+
+            resetButton.setOnClickListener(v -> {
+                // Implement logic to reset the test
+                // This may involve resetting UI elements and variables
+                selectedFileTextView.setText("No file selected");
+                startBatteryTextView.setText("Before batteryInMicroAmps: ");
+                endBatteryTextView.setText("After batteryInMicroAmps: ");
+                batteryStatsTextView.setText("Battery Stats: ");
+                testStatusTextView.setText("");
+                parsedDataRef.set(null);
+        });
+    }
+
+    private int getChargeCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if (batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        }
+        return -1;
+    }
+
+    private void saveResultsToFile(int startbatteryInMicroAmps, int endbatteryInMicroAmps) {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+                return;
+            }
         }
 
+        File file = new File(Environment.getExternalStorageDirectory(), "BatteryStats.txt");
+        try (FileWriter writer = new FileWriter(file, true)) {
+            if (mp4Files.isEmpty()) {
+                Log.d(TAG, "No MP4 files to log.");
+            } else {
+                for (String mp4File : mp4Files) {
+                    writer.append("FILE : MediaInfo: ").append(mp4File).append("\n");
+                    writer.append("Before batteryInMicroAmps: ").append(String.valueOf(startbatteryInMicroAmps)).append("\n");
+                    writer.append("After batteryInMicroAmps: ").append(String.valueOf(endbatteryInMicroAmps)).append("\n");
+                }
+                Log.d(TAG, "Battery stats written to BatteryStats.txt");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.e(TAG, "Error writing to BatteryStats.txt", e);
+        }
     }
+
+    private ParsedData parsePbtxtFile(String path) {
+        StringBuilder content = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return parsePbtxt(content.toString());
+    }
+
+    private ParsedData parsePbtxt(String content) {
+        ParsedData parsedData = new ParsedData();
+        String[] lines = content.split("\n");
+        for (String line : lines) {
+            if (line.contains("id:")) {
+                parsedData.setId(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.contains("description:")) {
+                parsedData.setDescription(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.contains("filepath:")) {
+                parsedData.setFilepath(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.contains("realtime:")) {
+                parsedData.setRealtime(Boolean.parseBoolean(line.split(":")[1].trim()));
+            } else if (line.contains("show:")) {
+                parsedData.setShow(Boolean.parseBoolean(line.split(":")[1].trim()));
+            } else if (line.contains("codec:")) {
+                parsedData.setCodec(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.contains("encode:")) {
+                parsedData.setEncode(Boolean.parseBoolean(line.split(":")[1].trim()));
+            } else if (line.contains("bitrate:")) {
+                parsedData.setBitrate(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.startsWith("preset:")) {
+                parsedData.setPreset(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.startsWith("colorSpace:")) {
+                parsedData.setColorSpace(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.startsWith("bitdepth:")) {
+                parsedData.setBitdepth(Integer.parseInt(line.split(":")[1].trim()));
+            } else if (line.startsWith("outputFile:")) {
+                parsedData.setOutputFile(line.split(":")[1].trim().replace("\"", ""));
+            } else if (line.startsWith("threads:")) {
+                parsedData.setThreads(Integer.parseInt(line.split(":")[1].trim()));
+            }
+        }
+        return parsedData;
+    }
+
+    private String getFilePathFromUri(Uri uri) {
+        String filePath = null;
+        if (DocumentsContract.isDocumentUri(this, uri)) {
+            String documentId = DocumentsContract.getDocumentId(uri);
+            String[] split = documentId.split(":");
+            String type = split[0];
+            String id = split[1];
+
+            if ("primary".equalsIgnoreCase(type)) {
+                filePath = Environment.getExternalStorageDirectory() + "/" + id;
+            }
+        }
+        return filePath;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "onDestroy called\n");
+        try {
+            java.lang.Process process = Runtime.getRuntime().exec("logcat -d");
+            BufferedReader bufferedReader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()));
+
+            String line = "";
+            FileWriter writer = null;
+            writer = new FileWriter(new File(
+                    Environment.getExternalStorageDirectory().getPath() + "/"
+                            + "logcat.log"));
+
+            while ((line = bufferedReader.readLine()) != null) {
+                writer.write(line);
+            }
+            writer.flush();
+            writer.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        Log.d(TAG, "Write done\n");
+    }
+
 
     protected void listCodecs() {
         Log.d(TAG, "List codecs");
