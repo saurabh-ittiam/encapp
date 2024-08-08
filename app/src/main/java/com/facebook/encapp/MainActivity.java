@@ -297,7 +297,7 @@ public class MainActivity extends AppCompatActivity {
 
                         saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
 
-                    }, /*30 * 60 */ 1 * 60 * 1000); // 30 minutes in milliseconds
+                    }, 30 * 60 * 1000); // 30 minutes in milliseconds
 
                 });
             stopButton.setOnClickListener(v -> {
@@ -385,6 +385,8 @@ public class MainActivity extends AppCompatActivity {
                 parsedData.setEncode(Boolean.parseBoolean(line.split(":")[1].trim()));
             } else if (line.contains("bitrate:")) {
                 parsedData.setBitrate(line.split(":")[1].trim().replace("\"", ""));
+            }else if (line.contains("resolution:")) {
+                parsedData.setResolution(line.split(":")[1].trim().replace("\"", ""));
             } else if (line.startsWith("preset:")) {
                 parsedData.setPreset(line.split(":")[1].trim().replace("\"", ""));
             } else if (line.startsWith("colorSpace:")) {

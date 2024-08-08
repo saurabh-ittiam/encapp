@@ -9,6 +9,7 @@ public class ParsedData {
     private String codec;
     private boolean encode;
     private String bitrate;
+    private String resolution;
     private String preset;
     private String colorSpace;
     private int bitdepth;
@@ -80,6 +81,10 @@ public class ParsedData {
     public void setBitrate(String bitrate) {
         this.bitrate = bitrate;
     }
+
+    public String getResolution() { return resolution; }
+
+    public void setResolution(String resolution) { this.resolution = resolution; }
 
     public String getPreset() {
         return preset;

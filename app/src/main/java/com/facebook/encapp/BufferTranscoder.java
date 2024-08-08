@@ -347,7 +347,9 @@ class BufferTranscoder extends Encoder {
 
         actualFrSize = (int)(inpBitstreamFrWidth*inpBitstreamFrHeight*1.5);
 
-        if(mEncoding && !("encoder.x264".equals(mTest.getConfigure().getCodec()))) {
+        boolean isx264Encoder = "encoder.x264".equals(mTest.getConfigure().getCodec());
+
+        if(mEncoding && !isx264Encoder) {
             MediaFormat encMediaFormat = null;
             try {
                 // Unless we have a mime, do lookup
@@ -446,18 +448,18 @@ class BufferTranscoder extends Encoder {
         try {
             // start bufferTranscoding
             long startTime = System.currentTimeMillis();
-            long durationMs = 1 * 60 * 1000; // 30 minutes
+            long durationMs = 30 * 60 * 1000; // 30 minutes
 
-            while (System.currentTimeMillis() - startTime < durationMs) {
-                mExtractor.setDataSource(mTest.getInput().getFilepath());
-                trackNum = mExtractor.getTrackCount();
+            //while (System.currentTimeMillis() - startTime < durationMs) {
+                //mExtractor.setDataSource(mTest.getInput().getFilepath());
+                //trackNum = mExtractor.getTrackCount();
 
                 bufferTranscoding(trackNum);
 
-                mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-                mExtractor.selectTrack(trackNum);
+                //mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+                //mExtractor.selectTrack(trackNum);
 
-            }
+            //}
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -573,6 +575,7 @@ class BufferTranscoder extends Encoder {
         MediaMuxer muxer = null;
         MediaCodec.BufferInfo bufferInfo = null;
         int videoTrackIndex = -1;
+        boolean isx264Encoder = "encoder.x264".equals(mTest.getConfigure().getCodec());
 
         String outputStreamName = "x264_transcoder_output.h264";
         String headerDump = "x264_transcoder_header_dump.h264";
@@ -650,8 +653,17 @@ class BufferTranscoder extends Encoder {
                 parentDir.mkdirs();
             }
 
+            int outWidth, outHeight;
+            boolean downscaler = false;
+            Size resolutionVideo = SizeUtils.parseXString(mTest.getConfigure().getResolution());
+            if(resolutionVideo != null) {
+                downscaler = true;
+            }
+            outWidth = downscaler ? downscaledFrWidth : inpBitstreamFrWidth;
+            outHeight = downscaler? downscaledFrHeight : inpBitstreamFrHeight;
 
-            int sizeOfHeader = x264Init(x264ConfigParamsInstance, inpBitstreamFrWidth, inpBitstreamFrHeight, colorSpace, bitDepth, headerArray);
+            int sizeOfHeader = x264Init(x264ConfigParamsInstance, outWidth, outHeight, colorSpace, bitDepth, headerArray);
+
             fileOutputStream2.write(headerArray, 0, sizeOfHeader);
 
             MuxerResult result = createMuxerX264(headerArray);
@@ -662,7 +674,7 @@ class BufferTranscoder extends Encoder {
             Log.d(TAG, "after init java");
         }
 
-        if(!("encoder.x264".equals(mTest.getConfigure().getCodec()))) {
+        if(!isx264Encoder) {
             currentDecOutputFormat = mDecoder.getOutputFormat();
             currentEncOutputFormat = mCodec.getOutputFormat();
         }
@@ -679,23 +691,21 @@ class BufferTranscoder extends Encoder {
             if (!decInpSubmitDone) {
                 submitFrameForDecoding(trackIndex);
             }
-            if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
-                getDecodedFrameAndSubmitForEncoding(headerArray, muxer, bufferInfo, videoTrackIndex, fileOutputStream);
-            } else {
+//            if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
+//                getDecodedFrameAndSubmitForEncoding(headerArray, muxer, bufferInfo, videoTrackIndex, fileOutputStream);
+//            } else {
                 //Get decoded frames from output buffers & submit to encoder
                 if (!decOutputExtractDone) {
-                    getDecodedFrameAndSubmitForEncoding();
+                    getDecodedFrameAndSubmitForEncoding(headerArray, muxer, bufferInfo, videoTrackIndex, fileOutputStream);
                 }
                 //Get encoded data and write to mp4 file
-                if(!encOutputExtractDone) {
+                if(!encOutputExtractDone && !("encoder.x264".equals(mTest.getConfigure().getCodec()))) {
                     getEncodedFrame();
                 }
-            }
+//            }
             if(encOutputExtractDone){
                 Log.d(TAG, "encOutputExtractDone is true and getEncodedFrame() execution is over");
             }
-            //if(trackIndex == (orgTrackIndex - 1))
-            //    trackIndex = 0;
         }
         if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
             if (muxer != null) {
@@ -707,7 +717,7 @@ class BufferTranscoder extends Encoder {
             }
             x264Close();
         }
-        if("encoder.x264".equals(mTest.getConfigure().getCodec())) {
+        if(isx264Encoder) {
             if (muxer != null) {
                 try {
                     muxer.release();
@@ -784,7 +794,8 @@ class BufferTranscoder extends Encoder {
         }
     }
 
-    void getDecodedFrameAndSubmitForEncoding() throws IOException {
+    void getDecodedFrameAndSubmitForEncoding(byte[] headerArray, MediaMuxer muxer, MediaCodec.BufferInfo bufferInfo,
+                                                int videoTrackIndex, FileOutputStream fileOutputStream) throws IOException {
         int index;
         index = mDecoder.dequeueOutputBuffer(info, (long) mFrameTimeUsec);
         Log.d(TAG, "Battery Tests: In getDecodedFrameAndSubmitForEncoding");
@@ -801,7 +812,7 @@ class BufferTranscoder extends Encoder {
             if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                 decOutputExtractDone = true;
                 Log.d(TAG, "decOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
-                submitFrameForEncoding(null, info);
+                submitFrameForEncoding(muxer, videoTrackIndex, fileOutputStream, info);
                 Log.d(TAG, "Output EOS");
                 try {
                     mDecoder.releaseOutputBuffer(index, 0);
@@ -823,7 +834,7 @@ class BufferTranscoder extends Encoder {
                     } else {
                         Log.e(TAG, "Not supported colour format");
                     }
-                    submitFrameForEncoding(null, info);
+                    submitFrameForEncoding(muxer, videoTrackIndex, fileOutputStream, info);
                 }
                 try {
                     image.close();
@@ -926,24 +937,28 @@ class BufferTranscoder extends Encoder {
         }
     }
 
-    public static byte[] extractYUVPlanes(byte[] yuvData, int width, int height, String format) {
+    public static byte[] extractYUVPlanes(ByteBuffer[] yuvBuffers, int width, int height, String format) {
         int ySize = width * height;
         int uvSize;
-
         byte[] concatenatedPlanes;
         if ("yuv420p".equalsIgnoreCase(format)) {
             uvSize = width * height / 4;
             concatenatedPlanes = new byte[ySize + 2 * uvSize];
 
-            System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
-            System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize);
-            System.arraycopy(yuvData, ySize + uvSize, concatenatedPlanes, ySize + uvSize, uvSize);
+            yuvBuffers[0].position(0);
+            yuvBuffers[1].position(0);
+            yuvBuffers[2].position(0);
+            copyPlane(yuvBuffers[0], concatenatedPlanes, 0, ySize);
+            copyPlane(yuvBuffers[1], concatenatedPlanes, ySize, uvSize);
+            copyPlane(yuvBuffers[2], concatenatedPlanes, ySize + uvSize, uvSize);
         } else if ("nv12".equalsIgnoreCase(format) || "nv21".equalsIgnoreCase(format)) {
             uvSize = width * height / 2;
             concatenatedPlanes = new byte[ySize + uvSize];
 
-            System.arraycopy(yuvData, 0, concatenatedPlanes, 0, ySize);
-            System.arraycopy(yuvData, ySize, concatenatedPlanes, ySize, uvSize); // UV interleaved plane
+            yuvBuffers[0].position(0);
+            yuvBuffers[1].position(0);
+            copyPlane(yuvBuffers[0], concatenatedPlanes, 0, ySize);
+            copyPlane(yuvBuffers[1], concatenatedPlanes, ySize, uvSize); // UV interleaved plane
         } else {
             throw new IllegalArgumentException("Unsupported YUV format: " + format);
         }
@@ -951,125 +966,89 @@ class BufferTranscoder extends Encoder {
         return concatenatedPlanes;
     }
 
-    void getDecodedFrameAndSubmitForEncoding(byte[] headerArray, MediaMuxer muxer,
-                                             MediaCodec.BufferInfo bufferInfo, int videoTrackIndex, FileOutputStream fileOutputStream) throws IOException {
-        int index;
-        boolean checkIDR = false;
-        findIDR findIDRInstance = new findIDR(checkIDR);
-
-        index = mDecoder.dequeueOutputBuffer(info, (long) mFrameTimeUsec);
-        if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
-            // no output available yet
-        } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-            if (Build.VERSION.SDK_INT >= 29) {
-                MediaFormat oformat = mDecoder.getOutputFormat();
-                latestFrameChanges = mediaFormatComparison(currentDecOutputFormat, oformat);
-                currentDecOutputFormat = oformat;
-            }
-            Log.d(TAG, "Media Format changed");
-        } else if(index >= 0) {
-            if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                decOutputExtractDone = true;
-                Log.d(TAG, "decOutputExtractDone is set to true in 'MediaCodec.BUFFER_FLAG_END_OF_STREAM' ");
-                submitFrameForEncoding(null, info);
-                Log.d(TAG, "Output EOS");
-                try {
-                    mDecoder.releaseOutputBuffer(index, 0);
-                } catch (IllegalStateException isx) {
-                    Log.e(TAG, "Illegal state exception when trying to release output buffers");
-                }
-            } else {
-                ByteBuffer outputBuffer = mDecoder.getOutputBuffer(index);
-                if (outputBuffer != null) {
-                    MediaFormat outputFormat = mDecoder.getOutputFormat();
-                    String colourSpace = determinePixelFormat(outputFormat);
-                    byte[] yuvData = new byte[info.size];
-                    outputBuffer.get(yuvData);
-                    int outWidth = outputFormat.getInteger(MediaFormat.KEY_WIDTH);
-                    int outHeight = outputFormat.getInteger(MediaFormat.KEY_HEIGHT);
-
-                    FrameInfo frameInfo = mStats.stopDecodingFrame(info.presentationTimeUs);
-                    frameInfo.addInfo(latestFrameChanges);
-                    latestFrameChanges = null;
-
-                    if (encInpSubmitDone & (mInFramesCount==(framesWritten + 1))) {
-                        encOutputExtractDone = true;
-                    }
-
-                    if ("encoder.x264".equals(mTest.getConfigure().getCodec())) {
-                        //int frameSize = inpBitstreamFrWidth * inpBitstreamFrHeight * 3 / 2;
-                        int frameSize = outWidth * outHeight * 3 / 2;
-                        int encodedBufferSize;
-                        byte[] encodedBuffer = new byte[frameSize];
-                        byte[] yuvByteArray = extractYUVPlanes(yuvData, outWidth, outHeight, colourSpace);
-
-                        encodedBufferSize = x264Encode(yuvByteArray, encodedBuffer, outWidth, outHeight, colourSpace, findIDRInstance);
-
-                        Log.d(TAG,"encodedBufferSize: " + encodedBufferSize);
-                        Log.d(TAG,"Battery tests in transcoder after x264Encode");
-
-                        ByteBuffer buffer = ByteBuffer.wrap(encodedBuffer);
-                        bufferInfo.offset = info.offset;
-                        bufferInfo.size = encodedBufferSize;
-                        bufferInfo.presentationTimeUs = info.presentationTimeUs;
-                        if (findIDRInstance.checkIDR) {
-                            bufferInfo.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
-                        } else {
-                            bufferInfo.flags = 0;
-                        }
-
-                        if(muxer != null) {
-                            buffer.position(bufferInfo.offset);
-                            buffer.limit(bufferInfo.offset + bufferInfo.size);
-
-                            muxer.writeSampleData(videoTrackIndex, buffer, bufferInfo);
-                            fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
-                        }
-                        framesWritten++;
-                        encInpSubmitDone = true;
-                    }
-                }
-                try {
-                    mDecoder.releaseOutputBuffer(index, 0);
-                } catch (IllegalStateException isx) {
-                    Log.e(TAG, "Illegal state exception when trying to release output buffers");
-                }
-            }
-        }
-        if(mRealtime) sleepUntilNextFrame(mFrameTimeUsec);
+    private static void copyPlane(ByteBuffer buffer, byte[] output, int outputOffset, int size) {
+        buffer.position(0);
+        buffer.get(output, outputOffset, size);
     }
 
-    void submitFrameForEncoding(ByteBuffer decodedBuffer, MediaCodec.BufferInfo decodedBufferInfo ) throws IOException {
+    void submitFrameForEncoding(MediaMuxer muxer, int videoTrackIndex, FileOutputStream fileOutputStream,
+                                MediaCodec.BufferInfo decodedBufferInfo ) throws IOException {
         int index = -1;
         long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
-            while (index < 0) {
+        boolean isX264Encoder = "encoder.x264".equals(mTest.getConfigure().getCodec());
+
+        while (index < 0) {
+            if(!isX264Encoder) {
                 index = mCodec.dequeueInputBuffer(timeoutUs);
+            } else {
+                index = 0;
+            }
+
             if(index==MediaCodec.INFO_TRY_AGAIN_LATER) {
-                    Log.d(TAG, "Waiting for input queue buffer for encoding");
-                    continue;
-            } else if (index >=0) {
-                Image  encInpimage = mCodec.getInputImage(index);
-                if(encInpimage != null) {
+                Log.d(TAG, "Waiting for input queue buffer for encoding");
+                continue;
+            } else if (index >= 0) {
+                Image encInpimage = null;
+                if (!isX264Encoder) {
+                    encInpimage = mCodec.getInputImage(index);
+                }
+
+                if(encInpimage != null || isX264Encoder) {
                     if(!decOutputExtractDone) {
-                            // Access the planes
+                        if (!isX264Encoder) {
                             Image.Plane[] planes = encInpimage.getPlanes();
                             if (planes.length == 3) {
-                            getYUVByteBuffers(planes, downscaleByteBuffArr,downscalePlaneStride, false);
-                        }else {
+                                getYUVByteBuffers(planes, downscaleByteBuffArr, downscalePlaneStride, false);
+                            } else {
                                 Log.e(TAG, "Not supported colour format");
                             }
-                            int retValue = JNIDownScaler(inpByteBuffArr, downscaleByteBuffArr, inpBitstreamFrWidth, inpBitstreamFrHeight, inpPlaneStride, decPixelfmt,
-                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride,encPixelfmt, downscaleFilterName);
-                        if(retValue !=0) {
-                                Log.d(TAG, "JNI retValue : " + retValue);
-                            }
+                        } else {
+                            String colourSpace = "nv12";
+                            int ySize = downscaledFrWidth * downscaledFrHeight;
+                            int uvSize;
+                            int divFac = inpBitstreamFrWidth / downscaledFrWidth;
+                            //if (colourSpace.equalsIgnoreCase("yuv420p"))
+                            //    uvSize = downscaledFrWidth * downscaledFrHeight / 4;
+                            //else
+                                uvSize = downscaledFrWidth * downscaledFrHeight / 2;
 
-                            boolean isNullBuffer = (inpByteBuffArr == null || downscaleByteBuffArr == null);
-                            if (isNullBuffer) {
-                                Log.d(TAG, "Buffer is null, skipping frame.");
-                            } else {
-                                mStats.startEncodingFrame(decodedBufferInfo.presentationTimeUs, mInFramesCount);
-                            }
+                            downscaleByteBuffArr[0] = ByteBuffer.allocateDirect(ySize);
+                            downscaleByteBuffArr[1] = ByteBuffer.allocateDirect(uvSize);
+                            //if (colourSpace.equalsIgnoreCase("yuv420p"))
+                                downscaleByteBuffArr[2] = ByteBuffer.allocateDirect(uvSize);
+
+                            downscalePlaneStride[0] = inpPlaneStride[0] / divFac;
+                            downscalePlaneStride[1] = inpPlaneStride[1] / divFac;
+                            //if (colourSpace.equalsIgnoreCase("yuv420p"))
+                                downscalePlaneStride[2] = inpPlaneStride[2] / divFac;
+                        }
+
+                        MediaFormat encMediaFormat = null;
+                        try {
+                            encMediaFormat = TestDefinitionHelper.buildMediaFormat(mTest);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                        Log.d(TAG, "MediaFormat (mTest)");
+                        logMediaFormat(encMediaFormat);
+                        setConfigureParams(mTest, encMediaFormat);
+                        //Setting encoder colour format
+                        if(mediaTekChip) {
+                            encMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+                            encPixelfmt = 19;
+                        } else {
+                            encMediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+                            encPixelfmt = 21;
+                        }
+
+                        int retValue = JNIDownScaler(inpByteBuffArr, downscaleByteBuffArr, inpBitstreamFrWidth, inpBitstreamFrHeight, inpPlaneStride, decPixelfmt,
+                                downscaledFrWidth, downscaledFrHeight, downscalePlaneStride, encPixelfmt, downscaleFilterName);
+                        if(retValue !=0) {
+                            Log.d(TAG, "JNI retValue : " + retValue);
+                        }
+
+                        mStats.startEncodingFrame(decodedBufferInfo.presentationTimeUs, mInFramesCount);
+                        if (!isX264Encoder) {
                             // Queue the buffer for encoding
                             mCodec.queueInputBuffer(index, 0 /* offset */, downscaledFrSize,
                                     decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
@@ -1078,26 +1057,73 @@ class BufferTranscoder extends Encoder {
                             Log.d(TAG, "submitted frame to enc : " + framesSubmitedToEnc);
                             framesSubmitedToEnc++;
                         } else {
-                            decodedBufferInfo.flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
-                            mCodec.queueInputBuffer(index, 0 /* offset */, 0, decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
-                            synchronized (this) {
-                                try {
-                                    wait(WAIT_TIME_SHORT_MS);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
-                                }
+                            boolean downscaler = false;
+                            int outWidth, outHeight;
+                            Size res = SizeUtils.parseXString(mTest.getConfigure().getResolution());
+                            if(res != null) {
+                                downscaler = true;
                             }
-                            encInpSubmitDone = true;
-                            Log.d(TAG, "Submitted EOF for encoder ");
-                        Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
-                                    " submitted frame for enc: " + mInFramesCount);
-                        }
-                }else {
-                        Log.d(TAG, "encInpBuffer is null");
-                    }
+                            outWidth = downscaler ? downscaledFrWidth : inpBitstreamFrWidth;
+                            outHeight = downscaler? downscaledFrHeight : inpBitstreamFrHeight;
 
-                } else {
-                    Log.d(TAG, "index value: " + index);
+                            boolean checkIDR = false;
+                            findIDR findIDRInstance = new findIDR(checkIDR);
+
+                            if (/*encInpSubmitDone & */(mInFramesCount == (framesWritten + 1))) {
+                                encOutputExtractDone = true;
+                            }
+                            Log.d(TAG, "encInpSubmitDone: " + encInpSubmitDone + " framesWritten: " + framesWritten + " mInFramesCount: " + mInFramesCount);
+
+                            String colourSpace = "nv12";//determinePixelFormat(outputFormat);
+                            int frameSize = outWidth * outHeight * 3 / 2;
+                            //byte[] yuvData = new byte[frameSize];
+                            int encodedBufferSize;
+                            byte[] encodedBuffer = new byte[frameSize];
+                            byte[] yuvByteArray = extractYUVPlanes(downscaleByteBuffArr, outWidth, outHeight, colourSpace);
+
+                            encodedBufferSize = x264Encode(yuvByteArray, encodedBuffer, outWidth, outHeight, colourSpace, findIDRInstance);
+                            Log.d(TAG,"encodedBufferSize: " + encodedBufferSize);
+
+                            ByteBuffer buffer = ByteBuffer.wrap(encodedBuffer);
+                            info.size = encodedBufferSize;
+                            if (findIDRInstance.checkIDR) {
+                                info.flags = MediaCodec.BUFFER_FLAG_KEY_FRAME;
+                            } else {
+                                info.flags = 0;
+                            }
+
+                            if(muxer != null) {
+                                buffer.position(info.offset);
+                                buffer.limit(info.offset + info.size);
+
+                                muxer.writeSampleData(videoTrackIndex, buffer, info);
+                                fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
+                            }
+                            framesWritten++;
+                        }
+                    } else {
+                        decodedBufferInfo.flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
+                        if (!isX264Encoder) {
+                            mCodec.queueInputBuffer(index, 0 /* offset */, 0, decodedBufferInfo.presentationTimeUs /* timeUs */, decodedBufferInfo.flags);
+                        }
+                        synchronized (this) {
+                            try {
+                                wait(WAIT_TIME_SHORT_MS);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        encInpSubmitDone = true;
+                        Log.d(TAG, "Submitted EOF for encoder ");
+                        Log.d(TAG, "Flag: " + decodedBufferInfo.flags + " Size: " + decodedBufferInfo.size + " presentationTimeUs: "+decodedBufferInfo.presentationTimeUs +
+                                " submitted frame for enc: " + mInFramesCount);
+                    }
+                }else {
+                    Log.d(TAG, "encInpBuffer is null");
+                }
+
+            } else {
+                Log.d(TAG, "index value: " + index);
             }
         }
     }
