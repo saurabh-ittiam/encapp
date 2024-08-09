@@ -32,7 +32,10 @@ def ffprobe_parse_output(stdout):
         if line in ("[STREAM]", "[/STREAM]"):
             # ignore start/end of stream
             continue
-        key, value = line.split("=")
+        if "=" not in line:
+            # skip lines that do not contain '='
+            continue
+        key, value = line.split("=", 1)
         # store interesting fields
         if key in FFPROBE_FIELDS.keys():
             # process some values
@@ -79,8 +82,25 @@ def get_video_info(videofile, debug=0):
 
 
 def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
+    resolution = settings.get("output", {}).get(
+        "resolution", settings.get("input", {}).get("resolution")
+    )
+    width = int(resolution.split("x")[0])
+    height = int(resolution.split("x")[1])
+    pad_w = int(
+        settings.get("output", {}).get(
+            "hstride", settings.get("input", {}).get("hstride", width)
+        )
+    )
+    pad_h = int(
+        settings.get("output", {}).get(
+            "vstride", settings.get("input", {}).get("vstride", width)
+        )
+    )
+
     filter_cmd = (
         f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))},"
+        f"pad={pad_w}:{pad_h},"
         f"fps={str(settings.get('output', {}).get('framerate', settings.get('input', {}).get('framerate')))}"
     )
     if debug > 0:
@@ -109,12 +129,62 @@ def ffmpeg_transcode_raw(input_filepath, output_filepath, settings, debug):
 
     # TODO(chema): run_cmd() should accept list of parameters
     cmd = " ".join(cmd)
-    print(f"cmd=\n{cmd}")
     ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
     assert ret, f"error: ffmpeg returned {stderr}"
 
 
-def ffmpeg_convert_to_raw(
+def ffmpeg_convert_to_raw(input_filepath, output_filepath, settings, debug):
+    resolution = settings.get("output", {}).get(
+        "resolution", settings.get("input", {}).get("resolution")
+    )
+    width = int(resolution.split("x")[0])
+    height = int(resolution.split("x")[1])
+    hstride = int(
+        settings.get("output", {}).get(
+            "hstride", settings.get("input", {}).get("hstride", width)
+        )
+    )
+    vstride = int(
+        settings.get("output", {}).get(
+            "vstride", settings.get("input", {}).get("vstride", -1)
+        )
+    )
+
+    filter_cmd = f"scale={settings.get('output', {}).get('resolution', settings.get('input', {}).get('resolution'))}"
+
+    if hstride > 0 and vstride > 0:
+        filter_cmd += f",pad={hstride}:{vstride}"
+
+    framerate = settings.get("output", {}).get(
+        "framerate", settings.get("input", {}).get("framerate")
+    )
+
+    if framerate and framerate > 0:
+        filter_cmd = filter_cmd + f",fps={framerate}"
+
+    if debug > 0:
+        print(f"filter command {filter_cmd}")
+    cmd = FFMPEG_SILENT + [
+        "-i",
+        input_filepath,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        settings.get("output", {}).get(
+            "pix_fmt", settings.get("input", {}).get("pix_fmt")
+        ),
+        "-vf",
+        filter_cmd,
+        output_filepath,
+    ]
+
+    # TODO(chema): run_cmd() should accept list of parameters
+    cmd = " ".join(cmd)
+    ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd, debug)
+    assert ret, f"error: ffmpeg returned {stderr}"
+
+
+def ffmpeg_convert_to_raw_simple(
     input_filepath, output_filepath, pix_fmt, video_size, framerate, debug
 ):
     cmd = FFMPEG_SILENT + [

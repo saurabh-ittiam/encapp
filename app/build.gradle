@@ -9,11 +9,8 @@ android {
         minSdkVersion 31
         targetSdkVersion 33
         versionCode 1
-        versionName "1.13"
-        setProperty("archivesBaseName", "$applicationId-v$versionName")
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
+        versionName "1.15"
+        setProperty("archivesBaseName", applicationId + "-v" + versionName)
     }
 
     buildTypes {
@@ -51,6 +48,7 @@ dependencies {
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '3.12.0'
     implementation group: 'com.google.protobuf', name: 'protobuf-java-util', version: '3.12.0'
     implementation 'com.google.code.gson:gson:2.8.0'
+    implementation 'com.google.protobuf:protobuf-java:3.19.4'
 }
 
 

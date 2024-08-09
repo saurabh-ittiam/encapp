@@ -22,6 +22,7 @@ import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.DataValueType;
 import com.facebook.encapp.proto.DecoderRuntime;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
@@ -318,7 +319,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         if (mDecoderRuntimeParams == null) return;
         Bundle bundle = new Bundle();
 
-        for (DecoderRuntime.Parameter param : mDecoderRuntimeParams.getParameterList()) {
+        for (Parameter param : mDecoderRuntimeParams.getParameterList()) {
             if (param.getFramenum() == frame) {
                 switch (param.getType().getNumber()) {
                     case DataValueType.floatType_VALUE:
@@ -514,18 +515,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         // Limit the pace of incoming frames to the framerate
                         sleepUntilNextFrameSynched();
                     }
-                    /*
-                    if (size > 0) {
-                        mStats.startDecodingFrame(ptsUsec, size, flags);
-                        try {
-                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
-                        } catch (IllegalStateException ise) {
-                            // Ignore this
-                        }
-                    } else {
-                        mDecoderBuffers.add(index);
-                    }
-                    */
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
                     }
@@ -552,6 +541,16 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         try {
                             mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
                             Log.d(TAG, "submitted frame to dec : " + mInFramesCount);
+                        } catch (IllegalStateException ise) {
+                            // Ignore this
+                        }
+                    } else {
+                        mDecoderBuffers.add(index);
+                    }
+                    if (size > 0) {
+                        mStats.startDecodingFrame(ptsUsec, size, flags);
+                        try {
+                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
                         } catch (IllegalStateException ise) {
                             // Ignore this
                         }

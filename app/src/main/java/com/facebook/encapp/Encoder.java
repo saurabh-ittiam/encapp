@@ -1,10 +1,7 @@
 package com.facebook.encapp;
 
-import static android.text.TextUtils.lastIndexOf;
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.getMediaFormatValueFromKey;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
 
-import android.graphics.ImageFormat;
 import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -13,16 +10,16 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.util.Log;
 import android.os.SystemClock;
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 
 import com.facebook.encapp.proto.Configure;
 import com.facebook.encapp.proto.DataValueType;
+import com.facebook.encapp.proto.Parameter;
 import com.facebook.encapp.proto.Runtime;
 import com.facebook.encapp.proto.Test;
-import com.facebook.encapp.utils.Assert;
 import com.facebook.encapp.utils.CliSettings;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FpsMeasure;
@@ -35,13 +32,10 @@ import com.facebook.encapp.utils.TestDefinitionHelper;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Dictionary;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -306,8 +300,8 @@ public abstract class Encoder {
     }
 
     protected void setConfigureParams(Test test, MediaFormat format) {
-        List<Configure.Parameter> params = test.getConfigure().getParameterList();
-        for (Configure.Parameter param : params) {
+        List<Parameter> params = test.getConfigure().getParameterList();
+        for (Parameter param : params) {
             switch (param.getType().getNumber()) {
                 case DataValueType.stringType_VALUE:
                     format.setString(param.getKey(), param.getValue());
@@ -373,7 +367,7 @@ public abstract class Encoder {
             }
         }
 
-        for (Runtime.Parameter param : mRuntimeParams.getParameterList()) {
+        for (Parameter param : mRuntimeParams.getParameterList()) {
             if (param.getFramenum() == frame) {
                 Log.d(TAG, "Set runtime parameter @ " + frame + " key: " + param.getKey() + ", " + param.getType() + ", " + param.getValue());
                 switch (param.getType().getNumber()) {
@@ -492,10 +486,11 @@ public abstract class Encoder {
         ConcurrentLinkedQueue<FrameBuffer> mEncodeBuffers = new ConcurrentLinkedQueue<>();
         boolean mDone = false;
 
+        int framesWritten = 0;
+
         public void stopWriter() {
             mDone = true;
         }
-        int framesWritten = 0;
 
         @Override
         public void run() {

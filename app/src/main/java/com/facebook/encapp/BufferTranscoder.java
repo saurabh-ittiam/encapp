@@ -884,6 +884,41 @@ class BufferTranscoder extends Encoder {
         return concatenated;
     }
 
+/*
+    public String determinePixelFormat(ByteBuffer[] downscaleByteBuffArr, int width, int height) {
+        int ySize = width * height;
+        int uvSize = (width / 2) * (height / 2);
+
+        // Check Plane 0 size (Y plane)
+        if (downscaleByteBuffArr[0].capacity() != ySize) {
+            return "Unknown format";
+        }
+
+        // Check Plane 1 and Plane 2 sizes
+        int plane1Size = downscaleByteBuffArr[1].capacity();
+        int plane2Size = downscaleByteBuffArr[2].capacity();
+
+        if (plane1Size == uvSize && plane2Size == uvSize) {
+            return "yuv420p";
+        } else if (plane1Size == 2 * uvSize && plane2Size == 0) {
+            // Plane 1 has interleaved UV or VU data
+            ByteBuffer uvBuffer = downscaleByteBuffArr[1];
+
+            // Check the first few bytes to differentiate NV12 and NV21
+            byte firstByte = uvBuffer.get(0);
+            byte secondByte = uvBuffer.get(1);
+
+            if (firstByte < secondByte) {
+                return "nv12";
+            } else {
+                return "nv21";
+            }
+        }
+
+        return "Unknown format";
+    }
+*/
+
     private String determinePixelFormat(MediaFormat format) {
         int colorFormat = format.getInteger(MediaFormat.KEY_COLOR_FORMAT);
         switch (colorFormat) {
@@ -896,7 +931,7 @@ class BufferTranscoder extends Encoder {
             case MediaCodecInfo.CodecCapabilities.COLOR_QCOM_FormatYUV420SemiPlanar:
             case MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar:
                 return "nv12";
-            /* TODO: Check with Saurabh if these are required? */
+            // TODO: Check with Saurabh if these are even required?
             case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Flexible:
             case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Planar:
             case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422PackedPlanar:
@@ -1047,7 +1082,7 @@ class BufferTranscoder extends Encoder {
                                 encOutputExtractDone = true;
                             }
 
-                            String colourSpace = "nv12";//determinePixelFormat(outputFormat);
+                            String colourSpace = determinePixelFormat(encMediaFormat);
                             int frameSize = outWidth * outHeight * 3 / 2;
                             //byte[] yuvData = new byte[frameSize];
                             int encodedBufferSize;

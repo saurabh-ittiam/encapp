@@ -4,7 +4,7 @@ import android.graphics.ImageFormat;
 import android.media.Image;
 import android.util.Log;
 
-import com.facebook.encapp.proto.Input.PixFmt;
+import com.facebook.encapp.proto.PixFmt;
 
 import java.io.BufferedInputStream;
 import java.io.File;
