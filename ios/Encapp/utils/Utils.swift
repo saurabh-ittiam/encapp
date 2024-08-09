@@ -8,12 +8,12 @@
 import Foundation
 
 func splitX(text: String)-> [Int] {
-
+    
     let split = (text.lowercased()).components(separatedBy: "x")
     print("\(text) -> split: \(split)")
     let w = split[0]
     let h = split[1]
-
+    
     let output = [w,h]
     print("\(output)")
     return [Int(w) ?? 0, Int(h) ?? 0]
@@ -44,7 +44,7 @@ func magnitudeToInt(stringValue: String)-> Int {
     if (text.hasSuffix( "bps")) {
         text = String(text.dropLast(3))
     }
-
+    
     var val = 0 as Int
     if (text.count == 0) {
         return 0;
@@ -55,7 +55,7 @@ func magnitudeToInt(stringValue: String)-> Int {
     } else {
         val = Int(text)!;
     }
-
+    
     return val;
 }
 
@@ -87,7 +87,7 @@ func doneReading(test: Test, stream: InputStream?, frame: Int, time: Float, loop
     if (test.input.hasPlayoutFrames && test.input.playoutFrames > 0) {
         // 2. stop the reader based on explicit playout frames parameter:
         // stop if we reached the explicit playout frames
-    if (frame >= test.input.playoutFrames) {
+        if (frame >= test.input.playoutFrames) {
             return true
         }
     }
@@ -107,22 +107,26 @@ func doneReading(test: Test, stream: InputStream?, frame: Int, time: Float, loop
     }
     // do not stop the reader
     return false
-
+    
 }
 
 // Swift does not allow a name loopup (which Android and python does)
-func pixFmtToString(format:  Input.PixFmt) -> String{
+func pixFmtToString(format: Input.PixFmt) -> String {
     switch format {
-    case Input.PixFmt.nv12:
+    case .nv12:
         return "nv12"
-    case Input.PixFmt.rgba:
+    case .rgba:
         return "rgba"
-    case Input.PixFmt.yuv420P:
+    case .yuv420P:
         return "yuv420p"
-    case Input.PixFmt.nv21:
+    case .nv21:
         return "nv21"
+    @unknown default:
+        // Handle future cases or unknown values
+        return "unknown"
     }
 }
+
 
 func sleepUntilNextFrame(lastTimeMs: Int64, frameDurationMs: Double) -> Int64 {
     let now = timeStampNs() / 1000000

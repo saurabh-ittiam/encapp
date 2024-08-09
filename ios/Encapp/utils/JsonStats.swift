@@ -24,7 +24,7 @@ struct JsonStats: Encodable {
     var encoderprops: Array<JsonProperties>
     var frames: Array<JsonFrameInfo>
     var decoded_frames: Array<JsonFrameInfo>
-
+    
 }
 
 struct JsonTest: Encodable {

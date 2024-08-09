@@ -10,10 +10,10 @@ import SwiftUI
 @main
 struct EncappApp: App {
     var body: some Scene {
-
+        
         WindowGroup {
             ContentView()
         }
     }
-
+    
 }

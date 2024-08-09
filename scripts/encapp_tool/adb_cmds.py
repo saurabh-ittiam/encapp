@@ -9,7 +9,7 @@ import typing
 
 ENCAPP_OUTPUT_FILE_NAME_RE = r"encapp_.*"
 USE_IDB = False
-IDB_BUNDLE_ID = "Meta.Encapp"
+IDB_BUNDLE_ID = "YashP.Encapp"
 IOS_VERSION_NAME = ""
 IOS_MAJOR_VERSION = -1
 
@@ -527,6 +527,7 @@ def file_exists_in_device(filename, serial, debug=False):
         cmd = f"idb file ls /Documents --udid {serial}  --bundle-id {IDB_BUNDLE_ID}"
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(f"{filename}", stdout, re.MULTILINE)
+        
         return len(output_files) > 0
 
 

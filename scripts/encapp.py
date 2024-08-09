@@ -24,16 +24,16 @@ import encapp_tool.app_utils
 import encapp_tool.adb_cmds
 import encapp_tool.ffutils
 import copy
+import subprocess
+import time
+import os
+
 
 SCRIPT_ROOT_DIR = os.path.abspath(
     os.path.join(encapp_tool.app_utils.SCRIPT_DIR, os.pardir)
 )
-SCRIPT_PROTO_DIR = os.path.abspath(
-    os.path.join(encapp_tool.app_utils.SCRIPT_DIR, "proto")
-)
 sys.path.append(SCRIPT_ROOT_DIR)
-sys.path.append(SCRIPT_PROTO_DIR)
-import tests_pb2 as tests_definitions  # noqa: E402
+import proto.tests_pb2 as tests_definitions  # noqa: E402
 
 
 RD_RESULT_FILE_NAME = "rd_results.json"
@@ -230,6 +230,7 @@ def run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug):
             debug,
         )
         assert ret, f"ERROR: {stderr}"
+    
     wait_for_exit(serial)
 
 
@@ -731,7 +732,7 @@ def update_media(test, options):
         if out_rate == "":
             out_rate = in_rate
 
-        input["pix_fmt"] = tests_definitions.PixFmt.Name(in_pix_fmt)
+        input["pix_fmt"] = tests_definitions.Input.PixFmt.Name(in_pix_fmt)
         input["resolution"] = in_res
         input["framerate"] = in_rate
 
@@ -768,7 +769,7 @@ def update_media(test, options):
             extension = "rgba"
         pix_fmt_id = out_pix_fmt if out_pix_fmt is not None else in_pix_fmt
         if str(pix_fmt_id).isnumeric():
-            pix_fmt = tests_definitions.PixFmt.Name(pix_fmt_id)
+            pix_fmt = tests_definitions.Input.PixFmt.Name(pix_fmt_id)
         else:
             pix_fmt = pix_fmt_id
 
@@ -866,7 +867,7 @@ def update_codec_test(
                 val = bool(val)
             # convert enum strings to integer
             if k1 == "input" and k2 == "pix_fmt":
-                val = tests_definitions.PixFmt.Value(val)
+                val = tests_definitions.Input.PixFmt.Value(val)
             if k1 == "configure" and k2 == "bitrate_mode":
                 val = tests_definitions.Configure.BitrateMode.Value(val)
             if k1 == "configure" and k2 == "color_standard":
@@ -918,9 +919,7 @@ def update_codec_test(
                     else info["framerate"]
                 )
             )
-            replace["output"]["pix_fmt"] = replace.get("input", {}).get(
-                "pix_fmt", PREFERRED_PIX_FMT
-            )
+            replace["output"]["pix_fmt"] = replace["input"]["pix_fmt"]
         else:
             replace["output"]["resolution"] = test.configure.resolution
             replace["output"]["framerate"] = test.configure.framerate
@@ -1333,36 +1332,6 @@ def codec_test(options, model, serial, debug):
         local_workdir = (
             f"{options.desc.replace(' ', '_')}_{model.replace(' ', '_')}_{dt_string}"
         )
-
-    # Create local_workdir
-    if not os.path.exists(local_workdir):
-        os.mkdir(local_workdir)
-    if len(options.configfile) > 1:
-        # merge the protobuf files
-        # First file will be the base
-        # For later definitions on the first test will be merged
-        # to all of the tests in the first prototbuf
-        # TODO: should parallels be considered?
-        test_suite = None
-        for proto in options.configfile:
-            tmp = tests_definitions.TestSuite()
-            with open(proto, "rb") as fd:
-                text_format.Merge(fd.read(), tmp)
-            if test_suite is None:
-                test_suite = tmp
-            elif len(test_suite.test):
-                for test in test_suite.test:
-                    if test is not None:
-                        test.MergeFrom(tmp.test[0])
-            else:
-                print("ERROR, first config file lacks a test")
-        basename = os.path.basename(options.configfile[0])
-        options.configfile = f"{local_workdir}/{basename}"
-        with open(options.configfile, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
-    else:
-        options.configfile = options.configfile[0]
-
     if options.mediastore is None:
         options.mediastore = local_workdir
     # check the protobuf text is correct
@@ -1565,7 +1534,7 @@ def get_options(argv):
     parser.add_argument(
         "configfile",
         type=str,
-        nargs="*",
+        nargs="?",
         default=default_values["configfile"],
         metavar="input-config-file",
         help="input configuration file",

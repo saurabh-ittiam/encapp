@@ -24,7 +24,7 @@ class Statistics {
     var decodedFrames: Array<FrameInfo>
     var frameLock = NSLock()
     var props: Array<JsonProperties>
-
+    
     init(description: String, test: Test) {
         self.description = description
         self.test = test
@@ -35,15 +35,17 @@ class Statistics {
         date = Date();
         id = "encapp_\(UUID().uuidString)"
     }
-
+    
     func start() {
         startTime = timeStampNs()
+        log.info("Encoding and Stats started")
     }
-
+    
     func stop() {
         stopTime = timeStampNs()
+        log.info("Encoding and Stats stoped")
     }
-
+    
     func startEncoding(pts: Int64, originalFrame: Int) {
         let frameInfo = FrameInfo(pts: pts, originalFrame: originalFrame)
         frameInfo.start()
@@ -51,8 +53,8 @@ class Statistics {
         encodingFrames.append(frameInfo)
         frameLock.unlock()
     }
-
-
+    
+    
     func stopEncoding(pts: Int64,size: Int64, isKeyFrame: Bool) {
         guard let frameInfo = getClosestEncodingMatch(pts: pts, array: encodingFrames) else {
             log.error("Error: could not find a matching frame")
@@ -69,9 +71,9 @@ class Statistics {
             encodingFrames.remove(at:index)
             frameLock.unlock()
         }
-
+        
     }
-
+    
     func startDecoding(pts: Int64) {
         let frameInfo = FrameInfo(pts: pts)
         frameInfo.start()
@@ -79,10 +81,10 @@ class Statistics {
         decodedFrames.append(frameInfo)
         frameLock.unlock()
     }
-
-
-
-
+    
+    
+    
+    
     func stopDeccoding(pts: Int64) {
         guard let frameInfo = getClosestEncodingMatch(pts: pts, array: decodedFrames) else {
             log.error("Error: could not find a matching frame")
@@ -90,12 +92,12 @@ class Statistics {
         }
         frameInfo.stop()
     }
-
-
+    
+    
     func getClosestEncodingMatch(pts: Int64, array: Array<FrameInfo>) -> FrameInfo? {
         var minDist = Int64.max
         var frameInfo: FrameInfo?
-
+        
         frameLock.lock()
         for info in array {
             let dist = abs(pts - info.pts)
@@ -107,30 +109,30 @@ class Statistics {
         frameLock.unlock()
         return frameInfo
     }
-
+    
     func getAverageBitrate(frames: Array<FrameInfo>)->Int {
         return 0
     }
-
+    
     func getProcessingTime() -> Int64 {
         return (stopTime! - startTime!);
     }
-
+    
     func setEncoderName(encoderName: String) {
         self.encoderName = encoderName
     }
-
+    
     func setSourceFile(filename: String) {
         self.sourceFile = filename
     }
-
+    
     func setEncodedFile(filename: String) {
         self.encodedFile = filename
     }
-
+    
     func getJson() -> String {
         let jsonEncoder = JSONEncoder()
-
+        
         //Convert frame info
         var eFrames = Array<JsonFrameInfo>()
         var frameCount = 0
@@ -145,7 +147,7 @@ class Statistics {
                                          starttime: info.getStartTime(),
                                          stoptime: info.getStopTime(),
                                          proctime: info.getProcessingTime()
-                                        )
+                )
                 frameCount += 1
                 eFrames.append(json)
             }
@@ -164,7 +166,7 @@ class Statistics {
                                          starttime: info.getStartTime(),
                                          stoptime: info.getStopTime(),
                                          proctime: info.getProcessingTime()
-                                        )
+                )
                 frameCount += 1
                 dFrames.append(json)
             }
@@ -172,7 +174,7 @@ class Statistics {
         frameLock.unlock()
         let input = test.input
         let jinput = JsonInput(filepath: input.filepath, resolution: input.resolution, pixFmt: pixFmtToString(format: input.pixFmt), framerate: input.framerate, playoutFrames: Int(input.playoutFrames), pursuit: Int(input.pursuit), realtime: input.realtime, stoptimeSec: input.stoptimeSec, show: input.show)
-
+        
         let conf = test.configure
         let runtime = test.runtime
         var jruntime = Array<JsonRuntime>()
@@ -181,17 +183,17 @@ class Statistics {
             let jrt = JsonRuntime(frameNum: item.framenum, key: item.key, type: String(item.type.rawValue), value: item.value)
             jruntime.append(jrt)
         }
-
+        
         let jparams = Array<JsonParameter>()
-
+        
         let jconfigure = JsonConfigure(parameter: jparams, codec: encoderName, encode: conf.encode, surface: conf.surface, mime: conf.mime, bitrate: conf.bitrate, bitrateMode: String(conf.bitrateMode.rawValue), durationUs: Int64(conf.durationUs), resolution: conf.resolution, colorFormat: conf.colorFormat.magnitude, colorStandard: conf.colorStandard.rawValue.formatted(), colorRange: conf.colorRange.rawValue.formatted(), colorTransfer: conf.colorTransfer.rawValue.formatted(), colorTransferRequest: conf.colorTransferRequest, framerate: conf.framerate, iFrameInterval: Int(conf.iFrameInterval), intraRefreshPeriod: Int(conf.intraRefreshPeriod), latency: Int(conf.latency), repeatPreviousFrameAfter: conf.repeatPreviousFrameAfter, tsSchema: conf.tsSchema, quality: Int(conf.quality), complexity: Int(conf.complexity))
-
+        
         let common = test.common
         let jcommon = JsonCommon(id: common.id, description: common.description_p, operation: common.operation, start: common.start)
-
+        
         let jtest = JsonTest(input: jinput, common: jcommon, configure: jconfigure, runtime: jruntime)
         let environment = "ios"
-
+        
         let stats = JsonStats(id: test.common.id,
                               description: (test?.common.debugDescription)!,
                               test: jtest,
@@ -206,21 +208,21 @@ class Statistics {
                               sourcefile: sourceFile,
                               encoderprops: props,
                               //? encoder_media_format: "",
-
+                              
                               frames: eFrames,
                               decoded_frames: dFrames)
-
+        
         jsonEncoder.outputFormatting = .prettyPrinted
         guard let json = try? jsonEncoder.encode(stats) else {
             log.error("Failed to create json stats")
             return ""
-
+            
         }
-
+        
         return String(data: json, encoding: .utf8)!
     }
-
-
+    
+    
     func addProp(name: String, val: String) {
         log.debug("Add prop: \(name) with value \(val)")
         props.append(JsonProperties(key: name, value: val))
