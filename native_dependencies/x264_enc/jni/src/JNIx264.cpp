@@ -74,16 +74,14 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
     x264Params.i_csp = colorSpace;
     x264Params.i_bitdepth = bitDepth;
 
-
     int val = X264_API x264_param_apply_profile(&x264Params, "main");
-    if(val  < 0)
-{
+    if(val < 0) {
         LOGI("Failed to set profile");
-}
+    }
+
     x264encoder->encoder = x264_encoder_open(&x264Params);
     x264_t *encoder = x264encoder->encoder;
-    if(!encoder)
-    {
+    if(!encoder) {
         LOGI("Failed encoder_open");
         return -1;
     }
@@ -102,7 +100,7 @@ int X264Encoder::init(JNIEnv *env, jobject thisObj, jobject x264ConfigParamsObj,
         for (int i = 0; i < nnal; i++) {
             if (nal[i].i_type == NAL_SPS || nal[i].i_type == NAL_PPS || nal[i].i_type == NAL_SEI ||
                 nal[i].i_type == NAL_AUD || nal[i].i_type == NAL_FILLER) {
-                // Check if there is enough space in the header array
+
                 if (offset + nal[i].i_payload > headerArraySize) {
                     env->ReleaseByteArrayElements(headerArray, headerArrayBuffer, 0);
                     return -1;
@@ -127,6 +125,7 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
     x264_picture_t pic_in = {0};
     x264_picture_t pic_out = {0};
+    int offset = 0;
 
     jclass x264FindIDRClass = env->GetObjectClass(x264FindIDRObj);
     jfieldID checkIDRFieldID = env->GetFieldID(x264FindIDRClass, "checkIDR", "Z");
@@ -182,44 +181,44 @@ int X264Encoder::encode(JNIEnv *env, jobject thisObj, jbyteArray yuvBuffer, jbyt
 
     int frame_size = x264_encoder_encode(encoder, &nal, &nnal, &pic_in, &pic_out);
 
-    int total_size = 2;
     if (frame_size > 0) {
-        for (int i = 0; i < nnal; i++) {
-            if (nal[i].i_type == NAL_SLICE_IDR) {
-LOGI("In IDR cond total_size JNI: %d", total_size);
-                checkIDR = true;
-            }
-            total_size += nal[i].i_payload;
-
-        }
-
-        LOGI("After total_size JNI: %d", total_size);
-        LOGI("nnal : %d", nnal);
-        if (out_buffer_size < total_size) {
+        if (out_buffer_size < frame_size) {
             env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
-            out_buffer = env->NewByteArray(total_size);
+            out_buffer = env->NewByteArray(frame_size);
             out_buffer_data = env->GetByteArrayElements(out_buffer, NULL);
         }
 
-        env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
-
-        int offset = 2;
+        LOGI("nnal: %d", nnal);
         for (int i = 0; i < nnal; i++) {
-            if (nal[i].i_type != NAL_SPS && nal[i].i_type != NAL_PPS && nal[i].i_type != NAL_SEI &&
-                nal[i].i_type != NAL_AUD && nal[i].i_type != NAL_FILLER) {
-                memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
-                offset += nal[i].i_payload;
+            if (nal[i].i_type == NAL_SLICE_IDR) {
+                checkIDR = true;
+            }
+
+            {
+                if(nal[i].p_payload[0] == 0x00 && nal[i].p_payload[1] == 0x00 && nal[i].p_payload[2] == 0x00) {
+                    memcpy(out_buffer_data + offset, nal[i].p_payload, nal[i].i_payload);
+                    offset += nal[i].i_payload;
+                }
+                else if (nal[i].p_payload[0] == 0x00 && nal[i].p_payload[1] == 0x00 && nal[i].p_payload[2] == 0x01) {
+                    memmove(out_buffer_data + offset + 1, out_buffer_data + offset, nal[i].i_payload);
+                    out_buffer_data[offset] = 0x00;
+                    memcpy(out_buffer_data + offset + 1, nal[i].p_payload, nal[i].i_payload);
+                    offset += nal[i].i_payload + 1;
+                }
+                else {
+                    LOGI("Start code not found");
+                    return -1;
+                }
             }
         }
-LOGI("After offset JNI: %d", offset);
+        env->SetBooleanField(x264FindIDRObj, checkIDRFieldID, checkIDR);
     }
 
     env->ReleaseByteArrayElements(yuvBuffer, yuvBuffer_data, 0);
     env->ReleaseByteArrayElements(out_buffer, out_buffer_data, 0);
-
     x264_picture_clean(&pic_in);
 
-    return (frame_size > 0) ? total_size : frame_size;
+    return offset;
 }
 
 void X264Encoder::close()
