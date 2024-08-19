@@ -1,2 +1,2 @@
 all:
-	/mnt/e/Tools/Linux/android-ndk-r26d/ndk-build
+	/e/Tools/Windows/android-ndk-r26d-windows/android-ndk-r26d/ndk-build.cmd

@@ -1101,9 +1101,6 @@ class BufferTranscoder extends Encoder {
                             }
 
                             if(muxer != null) {
-                                buffer.position(info.offset);
-                                buffer.limit(info.offset + info.size);
-
                                 muxer.writeSampleData(videoTrackIndex, buffer, info);
                                 fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
                             }
