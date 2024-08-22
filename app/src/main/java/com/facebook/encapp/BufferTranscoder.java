@@ -448,17 +448,16 @@ class BufferTranscoder extends Encoder {
         try {
             // start bufferTranscoding
             long startTime = System.currentTimeMillis();
-            long durationMs = 2 * 60 * 1000; // 30 minutes
+            long durationMs = 30 * 60 * 1000; // 30 minutes in ms
 
-            while (System.currentTimeMillis() - startTime < durationMs) {
+            //while (System.currentTimeMillis() - startTime < durationMs)
+            {
                 //mExtractor.setDataSource(mTest.getInput().getFilepath());
                 //trackNum = mExtractor.getTrackCount();
                 mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
                 mExtractor.selectTrack(trackNum);
 
                 bufferTranscoding(trackNum);
-
-
             }
         } catch (Exception e) {
             e.printStackTrace();
