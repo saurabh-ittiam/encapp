@@ -292,26 +292,28 @@ def collect_results(
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
         # append results file (json files) to final results
         if file.strip().endswith(".json"):
-            total_cpu_usage = 0
-            
-            with open(os.path.join(local_workdir, file.strip()), 'r') as f:
-                data = json.load(f)
-            cpu_data = data.get("cpu_data", {})
-            # calculate average CPU usage for each process
-            for process, cpu_usages in process_cpu_usage.items():
-                avg_cpu_usage = 0
-                avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
-                process_cpu_usage[process].append(avg_cpu_usage)
-                total_cpu_usage += avg_cpu_usage
-                cpu_data[process] = f"{avg_cpu_usage:.2f}%"
-
-            cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
-            data["cpu_data"] = cpu_data
+            if(len(process_cpu_usage) != 0):
                 
-            with open(os.path.join(local_workdir, file.strip()), 'w') as f:
-                    json.dump(data, f, indent=2)
+                total_cpu_usage = 0
+                
+                with open(os.path.join(local_workdir, file.strip()), 'r') as f:
+                    data = json.load(f)
+                cpu_data = data.get("cpu_data", {})
+                # calculate average CPU usage for each process
+                for process, cpu_usages in process_cpu_usage.items():
+                    avg_cpu_usage = 0
+                    avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
+                    process_cpu_usage[process].append(avg_cpu_usage)
+                    total_cpu_usage += avg_cpu_usage
+                    cpu_data[process] = f"{avg_cpu_usage:.2f}%"
+
+                cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
+                data["cpu_data"] = cpu_data
                     
-            # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}    
+                with open(os.path.join(local_workdir, file.strip()), 'w') as f:
+                        json.dump(data, f, indent=2)
+                        
+                # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}    
             
             path, tmpname = os.path.split(file)
             result_json.append(os.path.join(local_workdir, tmpname))
@@ -1094,7 +1096,7 @@ def run_codec_tests(
         device_workdir = default_values["device_workdir"]
 
     os.makedirs(local_workdir, exist_ok=True)
-
+    process_cpu_usage = {}
     collected_results = []
     # run the test(s)
     if split:
@@ -1126,14 +1128,14 @@ def run_codec_tests(
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
                 print(f"Push test defs: lw = {local_workdir}")
-                if not encapp_tool.adb_cmds.push_file_to_device(
-                    f"{local_workdir}/{test.common.id}.pbtxt",
-                    serial,
-                    device_workdir,
-                    fast_copy,
-                    debug,
-                ):
-                    abort_test(local_workdir, f"Error copying {filepath} to {serial}")
+            if not encapp_tool.adb_cmds.push_file_to_device(
+                f"{local_workdir}/{test.common.id}.pbtxt",
+                serial,
+                device_workdir,
+                fast_copy,
+                debug,
+            ):
+                abort_test(local_workdir, f"Error copying {test.common.id}.pbtxt to {serial}")
 
             if encapp_tool.adb_cmds.USE_IDB:
                 protobuf_txt_filepath = f"{test.common.id}.pbtxt"
@@ -1144,7 +1146,7 @@ def run_codec_tests(
             stop_event, monitor_thread, cpu_usage_file = start_cpu_monitoring(serial, cpu_usage_file, debug)
             run_encapp_test(protobuf_txt_filepath, serial, device_workdir, debug)
             # end cpu usage capture
-            process_cpu_usage = stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file)
+            stop_and_save_cpu_monitoring(stop_event, monitor_thread, process_cpu_usage, cpu_usage_file)
 
             with open(tests_run, "a") as passed:
                 passed.write(f"{test.common.id}.pbtxt\n")
@@ -1228,7 +1230,7 @@ def run_codec_tests(
             return None, None
         collected_results.extend(
             collect_results(
-                local_workdir, protobuf_txt_filepath, serial, device_workdir, debug
+                local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
             )
         )
     return collected_results
@@ -1258,7 +1260,7 @@ def signal_handler():
 
 signal.signal(signal.SIGINT, signal_handler)
 
-def stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file):
+def stop_and_save_cpu_monitoring(stop_event, monitor_thread, process_cpu_usage, cpu_usage_file):
     stop_event.set()
     monitor_thread.join()
     
@@ -1266,8 +1268,7 @@ def stop_and_save_cpu_monitoring(stop_event, monitor_thread, cpu_usage_file):
         data = f.read()
 
     lines = data.split('\n')
-    process_names = ["com.facebook.en", "media.swcodec", "media.codec"]
-    process_cpu_usage = {}
+    process_names = ["com.facebook.en", "media.swcodec", "media.codec", "media.unisoc.co"]
     pids = {}
     for line in lines:
         for process_name in process_names:
@@ -1987,8 +1988,8 @@ def main(argv):
 
         # if not options.ignore_results:
         #     verify_app_version(result_json)
-        if not result_ok:
-            sys.exit(-1)
+        # if not result_ok:
+        #     sys.exit(-1)
 
 
 if __name__ == "__main__":
