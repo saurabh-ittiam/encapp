@@ -96,10 +96,10 @@ public class TestDefinitionHelper {
             if (codecInfo.getName().equals(config.getCodec())) {
                 MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(config.getMime());
                 if (config.hasColorFormat()) {
-                    if(config.getCodec().toLowerCase(Locale.US).contains(".mtk.")) {
-                        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
-                    } else{
+                    if(config.getCodec().toLowerCase(Locale.US).contains("OMX.qcom.")) {
                         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
+                    } else{
+                        mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
                     }
                 }
                 int bitrateMode = -1;
