@@ -299,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
 
                         saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
 
-                    }, 60 * 1000); // 5 minutes in milliseconds
+                    }, 10 * 60 * 1000); // 10 minutes in milliseconds
 
                 });
             stopButton.setOnClickListener(v -> {
