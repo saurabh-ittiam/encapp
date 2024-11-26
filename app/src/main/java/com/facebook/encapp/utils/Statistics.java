@@ -7,6 +7,7 @@ import android.util.Log;
 import android.os.SystemClock;
 
 import com.facebook.encapp.Encoder;
+import com.facebook.encapp.MainActivity;
 import com.facebook.encapp.proto.Test;
 import com.google.protobuf.util.JsonFormat;
 
@@ -52,6 +53,12 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
+
+    int mstartbattery;
+    int mendbattery;
+    double mVoltage;
+    int mbatteryDifference;
+    double mtotalEnergyConsumption;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -265,6 +272,15 @@ public class Statistics {
     public void setStatus(String status) {
         mStatus = status;
     }
+
+    public void BatteryTest(int startbattery,int endbattery,double Voltage) {
+        mstartbattery = startbattery; //In MicroAmps
+        mendbattery = endbattery; //In MicroAmps
+        mVoltage = Voltage/1000; //In Volts
+        mbatteryDifference = startbattery - endbattery; //In MicroAmps
+        mtotalEnergyConsumption = mbatteryDifference * mVoltage; //In microwatts
+    }
+
     public void setEncoderMediaFormat(MediaFormat format) {
         mEncoderMediaFormat = format;
     }
@@ -375,10 +391,11 @@ public class Statistics {
     }
 
     @SuppressLint("DefaultLocale")
-    public void writeJSON(Writer writer) throws IOException {
+    public void writeJSON(Writer writer) throws IOException, JSONException {
         Log.d(TAG, "Write stats for " + mId);
+        JSONObject json = null;
         try {
-            JSONObject json = new JSONObject();
+            json = new JSONObject();
 
             json.put("id", mId);
             json.put("description", mDesc);
@@ -413,7 +430,7 @@ public class Statistics {
                     json.put("decoder_hw_accelerated", mIsDecoderHw);
                 }
             }
-            json.put("Status msg:", mStatus );
+            json.put("Status msg:", mStatus);
             ArrayList<FrameInfo> allFrames = mEncodingFrames;
             Comparator<FrameInfo> compareByPts = (FrameInfo o1, FrameInfo o2) -> Long.valueOf(o1.getPts()).compareTo(Long.valueOf(o2.getPts()));
             Collections.sort(allFrames, compareByPts);
@@ -430,7 +447,7 @@ public class Statistics {
                 obj.put("size", info.getSize());
                 obj.put("pts", info.getPts());
                 if (info.getStopTime() == 0) {
-                    Log.w(TAG, "Frame did not finish: " + (counter - 1) + ", orig: " +  info.getOriginalFrame());
+                    Log.w(TAG, "Frame did not finish: " + (counter - 1) + ", orig: " + info.getOriginalFrame());
                     obj.put("proctime", 0);
                 } else {
                     obj.put("proctime", info.getProcessingTime());
@@ -488,6 +505,17 @@ public class Statistics {
             cpuData.put("cores", String.valueOf(cores));
             json.put("cpu_data", cpuData);
 
+
+            //Battery info
+            JSONObject batteryData = new JSONObject();
+            batteryData.put("Start Battery (In MicroAmps)", mstartbattery);
+            batteryData.put("End Battery (In MicroAmps)",mendbattery);
+            batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
+            batteryData.put("Voltage (In Volts)",mVoltage);
+            batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
+            json.put("battery_data", batteryData);
+
+
             // GPU info
             JSONObject gpuData = new JSONObject();
             HashMap<String, String> gpuInfo = mLoad.getGPUInfo();
@@ -526,6 +554,8 @@ public class Statistics {
             gpuData.put("gpu_clock_freq", jsonArray);
             json.put("gpu_data", gpuData);
             writer.write(json.toString(2));
+
+
         } catch (JSONException e) {
             Log.e(TAG, "Failed writing stats");
             e.printStackTrace();

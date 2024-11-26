@@ -36,6 +36,6 @@ public class CliSettings {
     }
 
     public static String getWorkDir() {
-        return mWorkDir;
+        return "/sdcard/";
     }
 }

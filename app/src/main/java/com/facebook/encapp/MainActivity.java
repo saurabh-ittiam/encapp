@@ -61,12 +61,15 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
 import android.media.MediaCodec;
+
+import org.json.JSONException;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
@@ -924,8 +927,10 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Instances running: " + mInstancesRunning);
                 } finally {
                     // dump statistics
+                    long ts = Calendar.getInstance().get(Calendar.MILLISECOND);
                     final Statistics stats = coder.getStatistics();
-                    fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + ".json";
+                    Log.d(TAG, "CliSettings.getWorkDir() : " + CliSettings.getWorkDir());
+                    fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + "_" + String.valueOf(ts) + "_" + ".json";
                     stats.setAppVersion(getCurrentAppVersion());
                     stats.setStatus(status);
                     try {
@@ -935,6 +940,9 @@ public class MainActivity extends AppCompatActivity {
                         fw.close();
                     } catch (IOException e) {
                         Log.e(TAG, test.getCommon().getId() + " - Error when writing stats");
+                        e.printStackTrace();
+                    } catch (JSONException e) {
+                        Log.e(TAG, test.getCommon().getId() + " - Error when writing stats - JSONException");
                         e.printStackTrace();
                     }
                     decreaseTestsInflight();

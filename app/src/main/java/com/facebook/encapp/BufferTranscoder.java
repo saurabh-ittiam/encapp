@@ -777,16 +777,31 @@ class BufferTranscoder extends Encoder {
                     // End of stream reached; perform loopback
                     lastPresentationTimeUs += clipDurationUs;
                     accumulatedDurationUs += clipDurationUs;
+                    // **Note** : Run loopback till it exceeds totalDuration.
+                    // And Don't do accumulatedDurationUs += clipDurationUs;
+                    // Need to test with multiple test in pbtxt.
 
                     // Check if total duration has been reached
                     if (accumulatedDurationUs >= totalDurationUs) {
                         Log.d(TAG, "Reached End");
                         Log.d(TAG, "accumulatedDurationUs : " + accumulatedDurationUs);
-                        // End of stream - send EOS flag
-                        mDecoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L,
-                                MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                        decOutputExtractDone = true;
-                        break;
+                        long loopback_finished = Calendar.getInstance().getTimeInMillis();
+                        long elapsed_time = (loopback_finished - starttime) * 1000;
+
+                        Log.d(TAG, "elapsed_time : " + elapsed_time);
+
+                        if(elapsed_time < totalDurationUs) {
+                            accumulatedDurationUs = elapsed_time;
+                            continue;
+                        }
+                        else {
+                            // End of stream - send EOS flag
+                            mDecoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L,
+                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            decOutputExtractDone = true;
+                            break;
+                        }
+
                     } else {
                         continue;
                     }
@@ -1198,6 +1213,7 @@ class BufferTranscoder extends Encoder {
         int index = -1;
         long timeoutUs = VIDEO_CODEC_WAIT_TIME_US;
         boolean isX264Encoder = "encoder.x264".equals(mTest.getConfigure().getCodec());
+        int loopbreak = 0;
 
         while (index < 0) {
             if(!isX264Encoder) {
@@ -1208,7 +1224,10 @@ class BufferTranscoder extends Encoder {
 
             if(index==MediaCodec.INFO_TRY_AGAIN_LATER) {
                 Log.d(TAG, "Waiting for input queue buffer for encoding");
-                continue;
+                loopbreak++;
+                if(loopbreak > 20) {
+                    break;
+                }
             } else if (index >= 0) {
                 encodedequeuinput++;
                 Image encInpimage = null;
