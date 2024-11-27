@@ -289,35 +289,37 @@ def collect_results(
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
             cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
+            cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
         encapp_tool.adb_cmds.run_cmd(cmd, debug)
         # append results file (json files) to final results
-        if file.strip().endswith(".json"):
-            if(len(process_cpu_usage) != 0):
-                
-                total_cpu_usage = 0
-                
-                with open(os.path.join(local_workdir, file.strip()), 'r') as f:
-                    data = json.load(f)
-                cpu_data = data.get("cpu_data", {})
-                # calculate average CPU usage for each process
-                for process, cpu_usages in process_cpu_usage.items():
-                    avg_cpu_usage = 0
-                    avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
-                    process_cpu_usage[process].append(avg_cpu_usage)
-                    total_cpu_usage += avg_cpu_usage
-                    cpu_data[process] = f"{avg_cpu_usage:.2f}%"
+        if os.path.exists(file):
+            if file.strip().endswith(".json"):
+                if(len(process_cpu_usage) != 0):
 
-                cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
-                data["cpu_data"] = cpu_data
-                    
-                with open(os.path.join(local_workdir, file.strip()), 'w') as f:
-                        json.dump(data, f, indent=2)
-                        
-                # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}    
-            
-            path, tmpname = os.path.split(file)
-            result_json.append(os.path.join(local_workdir, tmpname))
-        
+                    total_cpu_usage = 0
+
+                    with open(os.path.join(local_workdir, file.strip()), 'r') as f:
+                        data = json.load(f)
+                    cpu_data = data.get("cpu_data", {})
+                    # calculate average CPU usage for each process
+                    for process, cpu_usages in process_cpu_usage.items():
+                        avg_cpu_usage = 0
+                        avg_cpu_usage = sum(cpu_usages) / len(cpu_usages)
+                        process_cpu_usage[process].append(avg_cpu_usage)
+                        total_cpu_usage += avg_cpu_usage
+                        cpu_data[process] = f"{avg_cpu_usage:.2f}%"
+
+                    cpu_data["Total_cpu_usage"] = f"{total_cpu_usage:.2f}%"
+                    data["cpu_data"] = cpu_data
+
+                    with open(os.path.join(local_workdir, file.strip()), 'w') as f:
+                            json.dump(data, f, indent=2)
+
+                    # avg_cpu = {key: values[-1] for key, values in process_cpu_usage.items()}
+
+                path, tmpname = os.path.split(file)
+                result_json.append(os.path.join(local_workdir, tmpname))
+
     # remove/process the test file
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
@@ -1268,7 +1270,7 @@ def stop_and_save_cpu_monitoring(stop_event, monitor_thread, process_cpu_usage, 
         data = f.read()
 
     lines = data.split('\n')
-    process_names = ["com.facebook.en", "media.swcodec", "media.codec", "media.unisoc.co"]
+    process_names = ["com.facebook.e", "media.swcodec", "media.codec", "media.unisoc.co"]
     pids = {}
     for line in lines:
         for process_name in process_names:

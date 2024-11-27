@@ -214,6 +214,8 @@ public abstract class Encoder {
             return (mFilename.lastIndexOf('.') > 0) ? mFilename.substring(0, mFilename.lastIndexOf('.')) : mFilename;
         }else{
             String codec_type = "hw";
+            String codec = "avc";
+
             //            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q){
 //                codec_type = mCodec.getCodecInfo().isHardwareAccelerated()
 //                        ? "hw"
@@ -221,9 +223,10 @@ public abstract class Encoder {
 //                        ? "sw"
 //                        : codec_type);
 //            }
-            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%dB_%dI_%s_%s",
+            String filename = String.format(Locale.US,"encapp_%s_%s_%s_%s_%s_%dB_%dI_%s_%s",
                     Paths.get(mTest.getInput().getFilepath()).getFileName().toString().replaceFirst("[.][^.]+$", ""),
                     mTest.getConfigure().getCodec().toString().startsWith("c2.android") || mTest.getConfigure().getCodec().toString().startsWith("OMX.google.h264.encoder") ? "sw" : codec_type,
+                    mTest.getConfigure().getCodec().toString().contains("hevc") || mTest.getConfigure().getCodec().toString().contains("h265") ? "hevc" : codec,
                     mTest.getConfigure().hasAvcProfile() ? mTest.getConfigure().getAvcProfile().toString().toLowerCase() :
                             (mTest.getConfigure().hasHevcProfile() ? mTest.getConfigure().getHevcProfile().toString().toLowerCase() : "NA"),
                     mTest.getConfigure().hasBitrateMode() ? mTest.getConfigure().getBitrateMode().toString() : "NA",
