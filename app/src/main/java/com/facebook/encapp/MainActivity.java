@@ -257,8 +257,31 @@ public class MainActivity extends AppCompatActivity {
                     startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     testStatusTextView.setText("Test is running...");
 
-                    Test test = createTestFromParsedData(parsedData);
-                    PerformTest(test);
+                    new Thread(() -> {
+                        Test test = createTestFromParsedData(parsedData);
+                        try {
+                            PerformTest(test).join();
+                        } catch (InterruptedException e){
+                            Log.d(TAG, "Error in PerformTest(test).join() : " + e.getMessage());
+                        }
+
+                        runOnUiThread(() -> {
+                            endbatteryInMicroAmps[0] = getChargeCounter();
+                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
+                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+                            testStatusTextView.setText("Test completed.");
+                            saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+                        });
+
+                    }).start();
+
+//                    Test test = createTestFromParsedData(parsedData);
+//                    try {
+//                        PerformTest(test).join();
+//                    } catch (InterruptedException e){
+//                        Log.d(TAG, "Error in PerformTest(test).join() : " + e.getMessage());
+//                    }
+
 
                     //if (!mp4Files.isEmpty()) {
                     //    for (String mp4FilePath : mp4Files) {
@@ -268,41 +291,41 @@ public class MainActivity extends AppCompatActivity {
                     //PerformTest(test);
                     //    }
                     //} else {
-                    if (getTestSettings()) {
-                        (new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                performAllTests();
-                                Log.d(TAG, "***** All tests are done, over and out *****");
-
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
-                                        batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
-                                        testStatusTextView.setText("Test completed.");
-                                    }
-                                });
-
-                                saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
-                                exit();
-                            }
-                        })).start();
-                    } else {
-                        listCodecs();
-                    }
+//                    if (getTestSettings()) {
+//                        (new Thread(new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                performAllTests();
+//                                Log.d(TAG, "***** All tests are done, over and out *****");
+//
+//                                runOnUiThread(new Runnable() {
+//                                    @Override
+//                                    public void run() {
+//                                        endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
+//                                        batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+//                                        testStatusTextView.setText("Test completed.");
+//                                    }
+//                                });
+//
+//                                saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+//                                exit();
+//                            }
+//                        })).start();
+//                    } else {
+//                        listCodecs();
+//                    }
                     //}
-                    new Handler().postDelayed(() -> {
-                        runOnUiThread(() -> {
-                            endbatteryInMicroAmps[0] = getChargeCounter();
-                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
-                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
-                            testStatusTextView.setText("Test completed.");
-                        });
-
-                        saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
-
-                    }, 60 * 1000); // 10 minutes in milliseconds
+//                    new Handler().postDelayed(() -> {
+//                        runOnUiThread(() -> {
+//                            endbatteryInMicroAmps[0] = getChargeCounter();
+//                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
+//                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+//                            testStatusTextView.setText("Test completed.");
+//                        });
+//
+//                        saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+//
+//                    }, 0); // 10 minutes in milliseconds
 
                 });
             stopButton.setOnClickListener(v -> {
