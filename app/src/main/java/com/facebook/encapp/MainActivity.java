@@ -1,6 +1,7 @@
 package com.facebook.encapp;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -92,6 +93,17 @@ public class MainActivity extends AppCompatActivity {
     private int mInstancesRunning = 0;
     VsyncHandler mVsyncHandler;
     final static int WAIT_TIME_MS = 5000;  // 5 secs
+
+    int scale = -1;
+    int level = -1;
+    static int voltage = -1;
+    int temp = -1;
+    String mp4OutputFile = "";
+    int startbattery;
+    int endbattery;
+    long mLoopback = 0;
+    Encoder coder;
+    String fullFilename="";
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
 
     public static boolean isStable() {
@@ -247,6 +259,21 @@ public class MainActivity extends AppCompatActivity {
             selectFileLauncher.launch(intent);
         });
 
+        BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
+
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
+                voltage = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1);
+                //Log.d(TAG, "voltage (in Volts) "+voltage/1000);
+                Log.e("BatteryManager", "level is "+level+"/"+scale+", temp is "+temp+", voltage is "+voltage);
+            }
+        };
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        registerReceiver(batteryReceiver, filter);
+
         startButton.setOnClickListener(v -> {
                     ParsedData parsedData = parsedDataRef.get();
                     if (parsedData == null) {
@@ -255,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                     startbatteryInMicroAmps[0] = getChargeCounter();
                     startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
+                    startbattery = startbatteryInMicroAmps[0];
                     testStatusTextView.setText("Test is running...");
 
                     new Thread(() -> {
@@ -266,11 +294,11 @@ public class MainActivity extends AppCompatActivity {
                         }
 
                         runOnUiThread(() -> {
-                            endbatteryInMicroAmps[0] = getChargeCounter();
-                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
-                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
+
+                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbattery);
+                            batteryStatsTextView.setText("Battery difference: " + (startbattery - endbattery));
                             testStatusTextView.setText("Test completed.");
-                            saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
+//                            saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
                         });
 
                     }).start();
@@ -934,11 +962,19 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
                     status = coder.start();
-                    if (status.length() == 0) {
+                    boolean status_flag = false;
+                    try {
+                        mLoopback = Long.parseLong(status);
+                        status_flag = true;
+                    }
+                    catch (NumberFormatException  e) {
+                        Log.d(TAG, "NumberFormatException Happened : " + e.getMessage());
+                    }
+                    if (status_flag) {
                         // test was ok
                         status = "Test completed without error";
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "ok", "");
-                    } else if (status.length() > 0) {
+                    } else {
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "error", status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
                         Log.d(TAG, "Pursuit over");
@@ -950,12 +986,15 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Instances running: " + mInstancesRunning);
                 } finally {
                     // dump statistics
-                    long ts = Calendar.getInstance().get(Calendar.MILLISECOND);
+                    long ts = Calendar.getInstance().getTimeInMillis();
                     final Statistics stats = coder.getStatistics();
-                    Log.d(TAG, "CliSettings.getWorkDir() : " + CliSettings.getWorkDir());
                     fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + "_" + String.valueOf(ts) + "_" + ".json";
                     stats.setAppVersion(getCurrentAppVersion());
                     stats.setStatus(status);
+                    Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
+                    endbattery = getChargeCounter();
+                    stats.LoopbackData(mLoopback);
+                    stats.BatteryTest(startbattery,endbattery,voltage);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, false);

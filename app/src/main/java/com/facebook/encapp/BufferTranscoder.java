@@ -79,6 +79,7 @@ class BufferTranscoder extends Encoder {
     int decodedequeuoutput = 0;
     int encodedequeuinput = 0;
     int encodedequeuoutput = 0;
+    long mLoopback = 0;
 
     /*Flag indicates dequeue decoded o/p from decoder */
     boolean decOutputExtractDone = false;
@@ -477,7 +478,7 @@ class BufferTranscoder extends Encoder {
         inpPlaneStride = null;
         downscaleByteBuffArr = null;
         downscalePlaneStride = null;
-        return "";
+        return String.valueOf(mLoopback);
     }
 
     public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
@@ -849,6 +850,7 @@ class BufferTranscoder extends Encoder {
         Log.d(TAG,"decodedequeuinput, decodedequeuoutput, encodedequeuinput, encodedequeuoutput : " + decodedequeuinput + " " + decodedequeuoutput + " " + encodedequeuinput + " " + encodedequeuoutput);
 
         Log.d(TAG, "loopback_counter : " + loopback_counter);
+        mLoopback = loopback_counter;
         if(isx264Encoder) {
             if (muxer != null) {
                 try {

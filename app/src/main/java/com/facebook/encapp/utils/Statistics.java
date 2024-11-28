@@ -59,6 +59,8 @@ public class Statistics {
     double mVoltage;
     int mbatteryDifference;
     double mtotalEnergyConsumption;
+    long mloopbacks = 0;
+    double menergy_consumption_per_loopback = 0.0;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
         MediaFormat.KEY_FRAME_RATE,
@@ -278,7 +280,14 @@ public class Statistics {
         mendbattery = endbattery; //In MicroAmps
         mVoltage = Voltage/1000; //In Volts
         mbatteryDifference = startbattery - endbattery; //In MicroAmps
-        mtotalEnergyConsumption = mbatteryDifference * mVoltage; //In microwatts
+        mtotalEnergyConsumption = mbatteryDifference * mVoltage;
+        if(mloopbacks > 0) {
+            menergy_consumption_per_loopback = mtotalEnergyConsumption/mloopbacks;//In microwatts
+        }
+    }
+
+    public void LoopbackData(long no_of_loopbacks) {
+        mloopbacks = no_of_loopbacks;
     }
 
     public void setEncoderMediaFormat(MediaFormat format) {
@@ -515,6 +524,11 @@ public class Statistics {
             batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
             json.put("battery_data", batteryData);
 
+            //Loopback info
+            JSONObject loopbackData = new JSONObject();
+            loopbackData.put("Number_of_Loopbacks", mloopbacks);
+            loopbackData.put("Energy_Consumption_per_loopback", menergy_consumption_per_loopback);
+            json.put("Loopback_data", loopbackData);
 
             // GPU info
             JSONObject gpuData = new JSONObject();
