@@ -71,6 +71,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import android.media.MediaCodec;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
@@ -102,6 +103,7 @@ public class MainActivity extends AppCompatActivity {
     int startbattery;
     int endbattery;
     long mLoopback = 0;
+    long accumulatedtime = 0;
     Encoder coder;
     String fullFilename="";
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
@@ -964,10 +966,14 @@ public class MainActivity extends AppCompatActivity {
                     status = coder.start();
                     boolean status_flag = false;
                     try {
-                        mLoopback = Long.parseLong(status);
+//                        mLoopback = Long.parseLong(status);
+//                        status_flag = true;
+                        JSONObject response = new JSONObject(status);
                         status_flag = true;
+                        mLoopback = response.getLong("loopback");
+                        accumulatedtime = response.getLong("accumulatedvalue");
                     }
-                    catch (NumberFormatException  e) {
+                    catch (JSONException  e) {
                         Log.d(TAG, "NumberFormatException Happened : " + e.getMessage());
                     }
                     if (status_flag) {
@@ -993,7 +999,7 @@ public class MainActivity extends AppCompatActivity {
                     stats.setStatus(status);
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                     endbattery = getChargeCounter();
-                    stats.LoopbackData(mLoopback);
+                    stats.LoopbackData(mLoopback, accumulatedtime);
                     stats.BatteryTest(startbattery,endbattery,voltage);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);

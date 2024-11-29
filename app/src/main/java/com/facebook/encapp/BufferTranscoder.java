@@ -80,6 +80,7 @@ class BufferTranscoder extends Encoder {
     int encodedequeuinput = 0;
     int encodedequeuoutput = 0;
     long mLoopback = 0;
+    long finalAccumulatedTime = 0;
 
     /*Flag indicates dequeue decoded o/p from decoder */
     boolean decOutputExtractDone = false;
@@ -478,7 +479,8 @@ class BufferTranscoder extends Encoder {
         inpPlaneStride = null;
         downscaleByteBuffArr = null;
         downscalePlaneStride = null;
-        return String.valueOf(mLoopback);
+
+        return "{ \"loopback\" : " + mLoopback + ",\"accumulatedvalue\" : " + finalAccumulatedTime + "}";
     }
 
     public void writeToBuffer(@NonNull MediaCodec codec, int index, boolean encoder) {
@@ -779,7 +781,13 @@ class BufferTranscoder extends Encoder {
 
                     // End of stream reached; perform loopback
                     lastPresentationTimeUs += clipDurationUs;
-                    accumulatedDurationUs += clipDurationUs;
+
+                    long loopback_finished = Calendar.getInstance().getTimeInMillis();
+                    long elapsed_time = (loopback_finished - starttime) * 1000;
+
+                    starttime = loopback_finished;
+
+                    accumulatedDurationUs += elapsed_time;
                     // **Note** : Run loopback till it exceeds totalDuration.
                     // And Don't do accumulatedDurationUs += clipDurationUs;
                     // Need to test with multiple test in pbtxt.
@@ -788,22 +796,13 @@ class BufferTranscoder extends Encoder {
                     if (accumulatedDurationUs >= totalDurationUs) {
                         Log.d(TAG, "Reached End");
                         Log.d(TAG, "accumulatedDurationUs : " + accumulatedDurationUs);
-                        long loopback_finished = Calendar.getInstance().getTimeInMillis();
-                        long elapsed_time = (loopback_finished - starttime) * 1000;
+                        finalAccumulatedTime = accumulatedDurationUs;
 
-                        Log.d(TAG, "elapsed_time : " + elapsed_time);
-
-                        if(elapsed_time < totalDurationUs) {
-                            accumulatedDurationUs = elapsed_time;
-                            continue;
-                        }
-                        else {
-                            // End of stream - send EOS flag
-                            mDecoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L,
-                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM);
-                            decOutputExtractDone = true;
-                            break;
-                        }
+                        // End of stream - send EOS flag
+                        mDecoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L,
+                                MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        decOutputExtractDone = true;
+                        break;
 
                     } else {
                         continue;

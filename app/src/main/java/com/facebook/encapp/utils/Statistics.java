@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class Statistics {
     final static String TAG = "encapp.statistics";
@@ -60,6 +61,7 @@ public class Statistics {
     int mbatteryDifference;
     double mtotalEnergyConsumption;
     long mloopbacks = 0;
+    long finalaccumulated = 0;
     double menergy_consumption_per_loopback = 0.0;
 
     private static List<String> MEDIAFORMAT_KEY_STRING_LIST = Arrays.asList(
@@ -286,8 +288,9 @@ public class Statistics {
         }
     }
 
-    public void LoopbackData(long no_of_loopbacks) {
+    public void LoopbackData(long no_of_loopbacks, long accumulatedtime) {
         mloopbacks = no_of_loopbacks;
+        finalaccumulated = accumulatedtime;
     }
 
     public void setEncoderMediaFormat(MediaFormat format) {
@@ -528,6 +531,8 @@ public class Statistics {
             JSONObject loopbackData = new JSONObject();
             loopbackData.put("Number_of_Loopbacks", mloopbacks);
             loopbackData.put("Energy_Consumption_per_loopback", menergy_consumption_per_loopback);
+            String accumulatedInMins = String.valueOf(TimeUnit.MINUTES.convert(finalaccumulated, TimeUnit.MICROSECONDS));
+            loopbackData.put("Total_time_taken_to_finish_transcoding", accumulatedInMins+" mins");
             json.put("Loopback_data", loopbackData);
 
             // GPU info
