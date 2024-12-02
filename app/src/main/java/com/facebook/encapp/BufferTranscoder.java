@@ -706,7 +706,7 @@ class BufferTranscoder extends Encoder {
             throw new IllegalStateException("Could not retrieve clip duration.");
         }
 
-        long starttime = Calendar.getInstance().getTimeInMillis();
+        long starttime = System.currentTimeMillis();
 //        long temp = mTest.getInput().getLoopbackTotalDuration();
 //        Log.d(TAG, "totalDurationUs : " + temp);
         while (accumulatedDurationUs < totalDurationUs) {
@@ -726,20 +726,6 @@ class BufferTranscoder extends Encoder {
 
                     // Flush the decoder to reset its state
                     mDecoder.flush();
-
-//                    mExtractor.release();
-//
-//                    mExtractor = new MediaExtractor();
-//
-//                    mExtractor.setDataSource(mTest.getInput().getFilepath());
-//                    mExtractor.selectTrack(trackIndex);
-
-                    // Seek back to the start for loopback
-//                    mExtractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
-
-                    // End of stream reached; perform loopback
-//                    lastPresentationTimeUs += clipDurationUs;
-//                    accumulatedDurationUs += clipDurationUs;
 
                     // Reset the error counter and add a small delay
                     consecutive = 0;
@@ -782,12 +768,13 @@ class BufferTranscoder extends Encoder {
                     // End of stream reached; perform loopback
                     lastPresentationTimeUs += clipDurationUs;
 
-                    long loopback_finished = Calendar.getInstance().getTimeInMillis();
+                    long loopback_finished = System.currentTimeMillis();
                     long elapsed_time = (loopback_finished - starttime) * 1000;
 
-                    starttime = loopback_finished;
+//                    starttime = loopback_finished;
 
-                    accumulatedDurationUs += elapsed_time;
+                    accumulatedDurationUs = elapsed_time;
+                    Log.d(TAG, "current accumulatedDurationUs : " + accumulatedDurationUs);
                     // **Note** : Run loopback till it exceeds totalDuration.
                     // And Don't do accumulatedDurationUs += clipDurationUs;
                     // Need to test with multiple test in pbtxt.
@@ -1337,6 +1324,7 @@ class BufferTranscoder extends Encoder {
                             }
 
                             if(muxer != null) {
+                                // Note : This is done to skip the mp4 output file creation
 //                                muxer.writeSampleData(videoTrackIndex, buffer, info);
 //                                fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
                             }
@@ -1426,6 +1414,7 @@ class BufferTranscoder extends Encoder {
                     if (mMuxer != null && mVideoTrack != -1) {
                         ++mOutFramesCount;
                         ByteBuffer data = mCodec.getOutputBuffer(index);
+                        // Note : This is done to skip the mp4 output file creation
 //                        mMuxer.writeSampleData(mVideoTrack, data, info);
                         //Log.d(TAG, "Muxer writing to file Frame No:: " + mOutFramesCount + " encoded o/p size: " +data.limit());
                         Log.d(TAG, "Muxer writing to file Frame No:: " + framesWritten);
