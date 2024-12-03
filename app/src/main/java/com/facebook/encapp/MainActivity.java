@@ -282,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(this, "No file selected or parsed.", Toast.LENGTH_SHORT).show();
                         return;
                     }
+                    listCodecs();
                     startbatteryInMicroAmps[0] = getChargeCounter();
                     startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     startbattery = startbatteryInMicroAmps[0];
