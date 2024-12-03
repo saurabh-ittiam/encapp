@@ -285,6 +285,8 @@ public class MainActivity extends AppCompatActivity {
                     startbatteryInMicroAmps[0] = getChargeCounter();
                     startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     startbattery = startbatteryInMicroAmps[0];
+                    endBatteryTextView.setText("After batteryInMicroAmps: ");
+                    batteryStatsTextView.setText("Battery difference: ");
                     testStatusTextView.setText("Test is running...");
 
                     new Thread(() -> {
