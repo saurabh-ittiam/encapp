@@ -147,7 +147,7 @@ message Serial {
 }
 
 message EncoderX264 {
-  optional string preset = 1 [default = "medium"];
+  optional string preset = 1 [default = "superfast"];
   optional string colorSpace = 2 [default = "yuv420p"];
   optional int32 bitdepth = 3 [default = 8];
   optional string outputFile = 4 [default = "x264Output.mp4"];

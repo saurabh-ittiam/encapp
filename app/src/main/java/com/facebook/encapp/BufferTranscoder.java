@@ -605,6 +605,7 @@ class BufferTranscoder extends Encoder {
             }
 
             String preset = mTest.getEncoderX264().getPreset();
+            Log.d(TAG, "preset value : " + preset);
             String colorSpace = mTest.getEncoderX264().getColorSpace();
             int bitDepth = mTest.getEncoderX264().getBitdepth();
             int threads = mTest.getEncoderX264().getThreads();
