@@ -60,6 +60,9 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -255,8 +258,9 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             Test.Builder tempBuilder = Test.newBuilder();
                             Log.d(TAG, "The path is : " + path);
-                            FileReader reader = new FileReader(path);
-                            TextFormat.getParser().merge(reader, tempBuilder);
+                            String test_path_contents = new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+                            Log.d(TAG, "test_path_contents contents : " + test_path_contents);
+                            TextFormat.getParser().merge(test_path_contents, tempBuilder);
                             Test testMessage = tempBuilder.build();
 
                             Log.d(TAG, "pbtxt file contents : " + testMessage);
