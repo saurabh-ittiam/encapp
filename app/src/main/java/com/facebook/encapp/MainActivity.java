@@ -250,6 +250,20 @@ public class MainActivity extends AppCompatActivity {
                         selectedFileTextView.setText(path);
                         ParsedData parsedData = parsePbtxtFile(path);
                         parsedDataRef.set(parsedData);
+
+                        //fetching the pbtxt values test
+                        try {
+                            Test.Builder tempBuilder = Test.newBuilder();
+                            Log.d(TAG, "The path is : " + path);
+                            FileReader reader = new FileReader(path);
+                            TextFormat.getParser().merge(reader, tempBuilder);
+                            Test testMessage = tempBuilder.build();
+
+                            Log.d(TAG, "pbtxt file contents : " + testMessage);
+                        }
+                        catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
         );
