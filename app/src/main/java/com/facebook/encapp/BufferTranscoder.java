@@ -455,7 +455,7 @@ class BufferTranscoder extends Encoder {
             }
         }
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
-        mStats.start();
+//        mStats.start();
         try {
             // start bufferTranscoding
             long startTime = System.currentTimeMillis();
@@ -707,9 +707,12 @@ class BufferTranscoder extends Encoder {
             throw new IllegalStateException("Could not retrieve clip duration.");
         }
 
+        totalDurationUs = mTest.getInput().getLoopbackTotalDuration();
+        if (totalDurationUs == 0) {
+            totalDurationUs = 60000000;
+        }
+        mStats.start();
         long starttime = System.currentTimeMillis();
-//        long temp = mTest.getInput().getLoopbackTotalDuration();
-//        Log.d(TAG, "totalDurationUs : " + temp);
         while (accumulatedDurationUs < totalDurationUs) {
             if (mInFramesCount % 100 == 0 && MainActivity.isStable()) {
                 Log.d(TAG, mTest.getCommon().getId() + " - " +
@@ -776,12 +779,20 @@ class BufferTranscoder extends Encoder {
 
                     accumulatedDurationUs = elapsed_time;
                     Log.d(TAG, "current accumulatedDurationUs : " + accumulatedDurationUs);
-                    // **Note** : Run loopback till it exceeds totalDuration.
-                    // And Don't do accumulatedDurationUs += clipDurationUs;
-                    // Need to test with multiple test in pbtxt.
 
+                    // If Loopback is disabled.
+                    if(mTest.getInput().getDisableLoopback()) {
+                        Log.d(TAG, "Loopback disabled");
+                        finalAccumulatedTime = accumulatedDurationUs;
+
+                        // End of stream - send EOS flag
+                        mDecoder.queueInputBuffer(inputBufferIndex, 0, 0, 0L,
+                                MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                        decOutputExtractDone = true;
+                        break;
+                    }
                     // Check if total duration has been reached
-                    if (accumulatedDurationUs >= totalDurationUs) {
+                    else if (accumulatedDurationUs >= totalDurationUs) {
                         Log.d(TAG, "Reached End");
                         Log.d(TAG, "accumulatedDurationUs : " + accumulatedDurationUs);
                         finalAccumulatedTime = accumulatedDurationUs;
@@ -830,13 +841,14 @@ class BufferTranscoder extends Encoder {
                 e.printStackTrace();
             }
         }
+        mStats.stop();
 
-        long endTime = Calendar.getInstance().getTimeInMillis();
-        long totalTime= endTime - starttime;
-
-        Log.d(TAG, "totalTime : " + totalTime);
-
-        Log.d(TAG,"decodedequeuinput, decodedequeuoutput, encodedequeuinput, encodedequeuoutput : " + decodedequeuinput + " " + decodedequeuoutput + " " + encodedequeuinput + " " + encodedequeuoutput);
+//        long endTime = Calendar.getInstance().getTimeInMillis();
+//        long totalTime= endTime - starttime;
+//
+//        Log.d(TAG, "totalTime : " + totalTime);
+//
+//        Log.d(TAG,"decodedequeuinput, decodedequeuoutput, encodedequeuinput, encodedequeuoutput : " + decodedequeuinput + " " + decodedequeuoutput + " " + encodedequeuinput + " " + encodedequeuoutput);
 
         Log.d(TAG, "loopback_counter : " + loopback_counter);
         mLoopback = loopback_counter;
@@ -1461,7 +1473,7 @@ class BufferTranscoder extends Encoder {
                 if (waitCount == 10)
                     break;
             }
-            mStats.stop();
+//            mStats.stop();
             Log.d(TAG, "Submitted frames to enc: " + framesSubmitedToEnc + " extracted frames from enc " + framesWritten);
             try {
                 if (mCodec != null) {

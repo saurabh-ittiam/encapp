@@ -280,7 +280,13 @@ public class Statistics {
     public void BatteryTest(int startbattery,int endbattery,double Voltage) {
         mstartbattery = startbattery; //In MicroAmps
         mendbattery = endbattery; //In MicroAmps
-        mVoltage = Voltage/1000; //In Volts
+        if(Voltage > 10) {
+            mVoltage = Voltage/1000; //In Volts
+        }
+        else {
+            mVoltage = Voltage;
+        }
+//        mVoltage = Voltage/1000; //In Volts
         mbatteryDifference = startbattery - endbattery; //In MicroAmps
         mtotalEnergyConsumption = mbatteryDifference * mVoltage;
         if(mloopbacks > 0) {
@@ -411,6 +417,25 @@ public class Statistics {
 
             json.put("id", mId);
             json.put("description", mDesc);
+
+            //Battery info
+            JSONObject batteryData = new JSONObject();
+            batteryData.put("Start Battery (In MicroAmps)", mstartbattery);
+            batteryData.put("End Battery (In MicroAmps)",mendbattery);
+            batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
+            batteryData.put("Voltage (In Volts)",mVoltage);
+            batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
+            json.put("battery_data", batteryData);
+
+            //Loopback info
+            JSONObject loopbackData = new JSONObject();
+            loopbackData.put("Number_of_iteration", mloopbacks);
+            loopbackData.put("Energy_Consumption_single_iteration (In microwatts)", menergy_consumption_per_loopback);
+            String accumulatedInMins = String.valueOf(TimeUnit.MINUTES.convert(finalaccumulated, TimeUnit.MICROSECONDS));
+            loopbackData.put("Total_time_taken_to_finish_transcoding", accumulatedInMins+" mins");
+            json.put("Loopback_data", loopbackData);
+
+
             // convert the test configuration to json
             String jsonStr = JsonFormat.printer().includingDefaultValueFields().print(mTest);
             json.put("test", new JSONObject(jsonStr));
@@ -517,23 +542,6 @@ public class Statistics {
             cpuData.put("cores", String.valueOf(cores));
             json.put("cpu_data", cpuData);
 
-
-            //Battery info
-            JSONObject batteryData = new JSONObject();
-            batteryData.put("Start Battery (In MicroAmps)", mstartbattery);
-            batteryData.put("End Battery (In MicroAmps)",mendbattery);
-            batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
-            batteryData.put("Voltage (In Volts)",mVoltage);
-            batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
-            json.put("battery_data", batteryData);
-
-            //Loopback info
-            JSONObject loopbackData = new JSONObject();
-            loopbackData.put("Number_of_Loopbacks", mloopbacks);
-            loopbackData.put("Energy_Consumption_per_loopback", menergy_consumption_per_loopback);
-            String accumulatedInMins = String.valueOf(TimeUnit.MINUTES.convert(finalaccumulated, TimeUnit.MICROSECONDS));
-            loopbackData.put("Total_time_taken_to_finish_transcoding", accumulatedInMins+" mins");
-            json.put("Loopback_data", loopbackData);
 
             // GPU info
             JSONObject gpuData = new JSONObject();

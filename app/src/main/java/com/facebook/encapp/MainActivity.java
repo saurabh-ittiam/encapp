@@ -68,6 +68,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
@@ -107,6 +108,9 @@ public class MainActivity extends AppCompatActivity {
     int endbattery;
     long mLoopback = 0;
     long accumulatedtime = 0;
+    TestSuite testMessage = null;
+    String jsonOutputDirpath = "";
+
     Encoder coder;
     String fullFilename="";
     private static List<String> VIDEO_ENCODED_EXTENSIONS = Arrays.asList("mp4", "webm", "mkv");
@@ -174,6 +178,26 @@ public class MainActivity extends AppCompatActivity {
         testBuilder.getConfigureBuilder().setEncode(parsedData.isEncode());
         testBuilder.getConfigureBuilder().setBitrate(parsedData.getBitrate());
         return testBuilder.build();
+    }
+
+    private boolean deleteDirectory(File dir) {
+        if(dir != null && dir.isDirectory()) {
+            String[] children = dir.list();
+            if(children != null) {
+                for(String child : children) {
+                    File childFile = new File(dir, child);
+                    if (childFile.isDirectory()) {
+                        if (!deleteDirectory(childFile)) {
+                            return false;
+                        }
+                    } else if (!childFile.delete()) {
+                        Log.e("DirectoryHandling", "Failed to delete file: " + childFile.getAbsolutePath());
+                        return false;
+                    }
+                }
+            }
+        }
+        return dir != null && dir.delete();
     }
 
 
@@ -256,14 +280,17 @@ public class MainActivity extends AppCompatActivity {
 
                         //fetching the pbtxt values test
                         try {
-                            Test.Builder tempBuilder = Test.newBuilder();
+                            TestSuite.Builder tempBuilder = TestSuite.newBuilder();
                             Log.d(TAG, "The path is : " + path);
                             String test_path_contents = new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
                             Log.d(TAG, "test_path_contents contents : " + test_path_contents);
                             TextFormat.getParser().merge(test_path_contents, tempBuilder);
-                            Test testMessage = tempBuilder.build();
+                            testMessage = tempBuilder.build();
 
-                            Log.d(TAG, "pbtxt file contents : " + testMessage);
+                            Log.d(TAG, "pbtxt file contents list : " + testMessage.getTestList());
+                            for(Test test: testMessage.getTestList()) {
+                                Log.d(TAG,"test value : " + test.toString());
+                            }
                         }
                         catch (IOException e) {
                             e.printStackTrace();
@@ -294,13 +321,14 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(batteryReceiver, filter);
 
+        listCodecs();
         startButton.setOnClickListener(v -> {
                     ParsedData parsedData = parsedDataRef.get();
                     if (parsedData == null) {
                         Toast.makeText(this, "No file selected or parsed.", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    listCodecs();
+
                     startbatteryInMicroAmps[0] = getChargeCounter();
                     startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     startbattery = startbatteryInMicroAmps[0];
@@ -308,10 +336,110 @@ public class MainActivity extends AppCompatActivity {
                     batteryStatsTextView.setText("Battery difference: ");
                     testStatusTextView.setText("Test is running...");
 
-                    new Thread(() -> {
-                        Test test = createTestFromParsedData(parsedData);
+                    File externalDir = null;
+                    try {
+                        externalDir = this.getExternalFilesDir(null);
+                        if(externalDir == null) {
+                            throw new IOException("External storage directory is unavailable.");
+                        }
+
+                        String path = externalDir.getAbsolutePath();
+                        Log.d(TAG, "ExternalFilesDir Path : " + path);
+
+                        File jsonDir = new File(externalDir, "outputJsonDir");
+
+                        // Remove the existing directory (if it exists)
+                        if (jsonDir.exists()) {
+                            if (deleteDirectory(jsonDir)) {
+                                Log.d("DirectoryHandling", "Existing directory deleted: " + jsonDir.getAbsolutePath());
+                            } else {
+                                throw new IOException("Failed to delete existing directory: " + jsonDir.getAbsolutePath());
+                            }
+                        }
+
+                        if(jsonDir.mkdirs()) {
+                            Log.d(TAG,"Directory created successfully.");
+                        }
+                        else {
+                            throw new IOException("Failed to create subdirectory.");
+                        }
+
+                        Log.d(TAG, "Json Files directory : " + jsonDir.getAbsolutePath());
+                        jsonOutputDirpath = jsonDir.getAbsolutePath();
+
+                    }
+                    catch (SecurityException e) {
+                        Log.e(TAG, "ExternalFilesDir permission Denied : " + e.getMessage());
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        Log.e(TAG, "ExternalFilesDir File operation failed : " + e.getMessage());
+                        e.printStackTrace();
+                    } catch (Exception e) {
+                        Log.e(TAG, "ExternalFilesDir Unexpected error : " + e.getMessage());
+                        e.printStackTrace();
+                    } finally {
+                        if(externalDir == null) {
+                            Log.w(TAG, "External dir could not be accessed.");
+                        }
+                    }
+
+                    if (Objects.equals(jsonOutputDirpath, "")) {
                         try {
-                            PerformTest(test).join();
+                            File jsonDir = new File("/sdcard/", "outputJsonDir");
+
+                            // Remove the existing directory (if it exists)
+                            if (jsonDir.exists()) {
+                                if (deleteDirectory(jsonDir)) {
+                                    Log.d("DirectoryHandling", "Existing directory deleted: " + jsonDir.getAbsolutePath());
+                                } else {
+                                    throw new IOException("Failed to delete existing directory in /sdcard/: " + jsonDir.getAbsolutePath());
+                                }
+                            }
+
+                            if(jsonDir.mkdirs()) {
+                                Log.d(TAG,"Directory created successfully in /sdcard/.");
+                            }
+                            else {
+                                throw new IOException("Failed to create subdirectory in /sdcard/.");
+                            }
+
+                            Log.d(TAG, "Json Files directory : " + jsonDir.getAbsolutePath());
+                            jsonOutputDirpath = jsonDir.getAbsolutePath();
+                        }
+                        catch (SecurityException e) {
+                            Log.e(TAG, "ExternalFilesDir permission Denied in /sdcard/ : " + e.getMessage());
+                            e.printStackTrace();
+                        } catch (IOException e) {
+                            Log.e(TAG, "ExternalFilesDir File operation failed in /sdcard/ : " + e.getMessage());
+                            e.printStackTrace();
+                        } catch (Exception e) {
+                            Log.e(TAG, "ExternalFilesDir Unexpected error in /sdcard/ : " + e.getMessage());
+                            e.printStackTrace();
+                        } finally {
+                            if(Objects.equals(jsonOutputDirpath, "")) {
+                                Log.w(TAG, "External dir could not be accessed in /sdcard/.");
+                                jsonOutputDirpath = "/sdcard";
+                            }
+                        }
+                    }
+
+
+
+
+                    new Thread(() -> {
+                        boolean flag = testMessage != null && !testMessage.getTestList().isEmpty();
+
+                        try {
+                            if(flag) {
+                                for(Test test : testMessage.getTestList()) {
+                                    PerformTest(test).join();
+                                }
+                            }
+                            else {
+                                Test test = createTestFromParsedData(parsedData);
+                                PerformTest(test).join();
+                            }
+
                         } catch (InterruptedException e){
                             Log.d(TAG, "Error in PerformTest(test).join() : " + e.getMessage());
                         }
@@ -325,58 +453,6 @@ public class MainActivity extends AppCompatActivity {
                         });
 
                     }).start();
-
-//                    Test test = createTestFromParsedData(parsedData);
-//                    try {
-//                        PerformTest(test).join();
-//                    } catch (InterruptedException e){
-//                        Log.d(TAG, "Error in PerformTest(test).join() : " + e.getMessage());
-//                    }
-
-
-                    //if (!mp4Files.isEmpty()) {
-                    //    for (String mp4FilePath : mp4Files) {
-                    //        Test.Builder testBuilder = Test.newBuilder();
-                    //        testBuilder.getInputBuilder().setFilepath(mp4FilePath);
-                    //test = createTestFromParsedData(parsedData);
-                    //PerformTest(test);
-                    //    }
-                    //} else {
-//                    if (getTestSettings()) {
-//                        (new Thread(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                performAllTests();
-//                                Log.d(TAG, "***** All tests are done, over and out *****");
-//
-//                                runOnUiThread(new Runnable() {
-//                                    @Override
-//                                    public void run() {
-//                                        endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
-//                                        batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
-//                                        testStatusTextView.setText("Test completed.");
-//                                    }
-//                                });
-//
-//                                saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
-//                                exit();
-//                            }
-//                        })).start();
-//                    } else {
-//                        listCodecs();
-//                    }
-                    //}
-//                    new Handler().postDelayed(() -> {
-//                        runOnUiThread(() -> {
-//                            endbatteryInMicroAmps[0] = getChargeCounter();
-//                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbatteryInMicroAmps[0]);
-//                            batteryStatsTextView.setText("Battery difference: " + (startbatteryInMicroAmps[0] - endbatteryInMicroAmps[0]));
-//                            testStatusTextView.setText("Test completed.");
-//                        });
-//
-//                        saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
-//
-//                    }, 0); // 10 minutes in milliseconds
 
                 });
             stopButton.setOnClickListener(v -> {
@@ -1015,7 +1091,19 @@ public class MainActivity extends AppCompatActivity {
                     // dump statistics
                     long ts = Calendar.getInstance().getTimeInMillis();
                     final Statistics stats = coder.getStatistics();
-                    fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + "_" + String.valueOf(ts) + "_" + ".json";
+//                    fullFilename = CliSettings.getWorkDir() + "/" + coder.getOutputFilename() + "_" + String.valueOf(ts) + "_" + ".json";
+
+                    // Device manufacturer and model.
+                    String manufacturer = Build.MANUFACTURER;
+                    String model = Build.MODEL;
+                    model = model.replaceAll("\\s+", "_");
+                    String Device_name = manufacturer + "_" + model;
+
+                    Log.d(TAG, "test.getEncoderX264().hasPreset() : " + test.getEncoderX264().hasPreset() );
+
+                    String presetvalue = test.getEncoderX264().hasPreset() ? test.getEncoderX264().getPreset() + "_" : "";
+
+                    fullFilename = jsonOutputDirpath + "/" + coder.getOutputFilename() + "_" + Device_name + "_" + presetvalue + String.valueOf(ts) + "_" + ".json";
                     stats.setAppVersion(getCurrentAppVersion());
                     stats.setStatus(status);
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
