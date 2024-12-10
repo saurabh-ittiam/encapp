@@ -119,12 +119,53 @@ public class MainActivity extends AppCompatActivity {
         return mStable;
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // Call the methods to check and request permissions
+        checkAndRequestAllFilesAccessPermission();
+        checkAndRequestWriteSettingsPermission();
+    }
+
     private List<String> mp4Files = new ArrayList<>();
 
     public static String getFilenameExtension(String filename) {
         int last_dot_location = filename.lastIndexOf('.');
         String extension = (last_dot_location == -1) ? "" : filename.substring(last_dot_location+1);
         return extension;
+    }
+
+    /**
+     * Check and request ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+     */
+    private void checkAndRequestAllFilesAccessPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                // Request All Files Access permission
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } else {
+                Toast.makeText(this, "All Files Access permission already granted", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    /**
+     * Check and request ACTION_MANAGE_WRITE_SETTINGS
+     */
+
+
+    private void checkAndRequestWriteSettingsPermission() {
+        if (!Settings.System.canWrite(this)) {
+            // Request Write Settings permission
+            Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "Write Settings permission already granted", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private static String[] retrieveNotGrantedPermissions(Context context) {
@@ -249,20 +290,20 @@ public class MainActivity extends AppCompatActivity {
             useNewMethod = !mExtraData.getBoolean(CliSettings.OLD_AUTH_METHOD, false);
         }
 
-        if (Build.VERSION.SDK_INT >= 30 && useNewMethod && !Environment.isExternalStorageManager()) {
-            Log.d(TAG, "Check ExternalStorageManager");
-            // request the external storage manager permission
-            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            Uri uri = Uri.fromParts("package", getPackageName(), null);
-            intent.setData(uri);
-            try {
-                startActivity(intent);
-            } catch (android.content.ActivityNotFoundException ex) {
-                Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
-                // System.exit(-1);
-                Toast.makeText(this, "Missing MANAGE_APP_ALL_FILES_ACCESS_PERMISSION request,", Toast.LENGTH_LONG).show();
-            }
-        }
+//        if (Build.VERSION.SDK_INT >= 30 && useNewMethod && !Environment.isExternalStorageManager()) {
+//            Log.d(TAG, "Check ExternalStorageManager");
+//            // request the external storage manager permission
+//            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+//            Uri uri = Uri.fromParts("package", getPackageName(), null);
+//            intent.setData(uri);
+//            try {
+//                startActivity(intent);
+//            } catch (android.content.ActivityNotFoundException ex) {
+//                Log.e(TAG, "No activity found for handling the permission intent: " + ex.getLocalizedMessage());
+//                // System.exit(-1);
+//                Toast.makeText(this, "Missing MANAGE_APP_ALL_FILES_ACCESS_PERMISSION request,", Toast.LENGTH_LONG).show();
+//            }
+//        }
         mTable = findViewById(R.id.viewTable);
 
         Log.d(TAG, "Passed all permission checks");
@@ -335,6 +376,8 @@ public class MainActivity extends AppCompatActivity {
                     endBatteryTextView.setText("After batteryInMicroAmps: ");
                     batteryStatsTextView.setText("Battery difference: ");
                     testStatusTextView.setText("Test is running...");
+
+                    setScreenBrightness(1);
 
                     File externalDir = null;
                     try {
@@ -449,6 +492,7 @@ public class MainActivity extends AppCompatActivity {
                             endBatteryTextView.setText("After batteryInMicroAmps: " + endbattery);
                             batteryStatsTextView.setText("Battery difference: " + (startbattery - endbattery));
                             testStatusTextView.setText("Test completed.");
+                            setScreenBrightness(255);
 //                            saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
                         });
 
@@ -471,6 +515,31 @@ public class MainActivity extends AppCompatActivity {
                 testStatusTextView.setText("");
                 parsedDataRef.set(null);
         });
+    }
+
+    private void setScreenBrightness(int brightnessLevel) {
+        try {
+            // Ensure the brightness level is within the valid range
+            if (brightnessLevel < 0) brightnessLevel = 0;
+            if (brightnessLevel > 255) brightnessLevel = 255;
+
+            Settings.System.putInt(
+                    getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+            );
+
+            // Update the system brightness setting
+            Settings.System.putInt(
+                    getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS,
+                    brightnessLevel
+            );
+            Toast.makeText(this, "Brightness set to " + brightnessLevel, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Failed to change brightness", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private int getChargeCounter() {
