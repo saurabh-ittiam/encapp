@@ -1101,8 +1101,8 @@ class BufferTranscoder extends Encoder {
                             }
 
                             if(muxer != null) {
-                                muxer.writeSampleData(videoTrackIndex, buffer, info);
-                                fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
+//                                muxer.writeSampleData(videoTrackIndex, buffer, info);
+//                                fileOutputStream.write(buffer.array(), 0, encodedBufferSize);
                             }
                             framesWritten++;
                         }
@@ -1184,7 +1184,7 @@ class BufferTranscoder extends Encoder {
                     if (mMuxer != null && mVideoTrack != -1) {
                         ++mOutFramesCount;
                         ByteBuffer data = mCodec.getOutputBuffer(index);
-                        mMuxer.writeSampleData(mVideoTrack, data, info);
+//                        mMuxer.writeSampleData(mVideoTrack, data, info);
                         //Log.d(TAG, "Muxer writing to file Frame No:: " + mOutFramesCount + " encoded o/p size: " +data.limit());
                         Log.d(TAG, "Muxer writing to file Frame No:: " + framesWritten);
                         framesWritten++;
