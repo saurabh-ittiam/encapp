@@ -476,6 +476,7 @@ public class MainActivity extends AppCompatActivity {
                             if(flag) {
                                 for(Test test : testMessage.getTestList()) {
                                     PerformTest(test).join();
+                                    startbattery = getChargeCounter();
                                 }
                             }
                             else {
@@ -1130,23 +1131,23 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Log.d(TAG, "Start test id: \"" + test.getCommon().getId() + "\"");
                     status = coder.start();
-                    boolean status_flag = false;
-                    try {
-//                        mLoopback = Long.parseLong(status);
+//                    boolean status_flag = false;
+//                    try {
+////                        mLoopback = Long.parseLong(status);
+////                        status_flag = true;
+//                        JSONObject response = new JSONObject(status);
 //                        status_flag = true;
-                        JSONObject response = new JSONObject(status);
-                        status_flag = true;
-                        mLoopback = response.getLong("loopback");
-                        accumulatedtime = response.getLong("accumulatedvalue");
-                    }
-                    catch (JSONException  e) {
-                        Log.d(TAG, "NumberFormatException Happened : " + e.getMessage());
-                    }
-                    if (status_flag) {
+//                        mLoopback = response.getLong("loopback");
+//                        accumulatedtime = response.getLong("accumulatedvalue");
+//                    }
+//                    catch (JSONException  e) {
+//                        Log.d(TAG, "NumberFormatException Happened : " + e.getMessage());
+//                    }
+                    if (status.length() == 0) {
                         // test was ok
                         status = "Test completed without error";
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "ok", "");
-                    } else {
+                    } else if (status.length() > 0) {
                         report_result(coder.mTest.getCommon().getId(), coder.getStatistics().getId(), "error", status);
                         //    if (test.getPursuit() == 0) { TODO: pursuit
                         Log.d(TAG, "Pursuit over");
@@ -1177,7 +1178,7 @@ public class MainActivity extends AppCompatActivity {
                     stats.setStatus(status);
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                     endbattery = getChargeCounter();
-                    stats.LoopbackData(mLoopback, accumulatedtime);
+//                    stats.LoopbackData(mLoopback, accumulatedtime);
                     stats.BatteryTest(startbattery,endbattery,voltage);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
