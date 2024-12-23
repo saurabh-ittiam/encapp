@@ -540,7 +540,7 @@ public abstract class Encoder {
                                 }
                                 if (mMuxer != null && mVideoTrack != -1) {
                                     ByteBuffer data = mCodec.getOutputBuffer(frameBuffer.mBufferId);
-                                    mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
+//                                    mMuxer.writeSampleData(mVideoTrack, data, frameBuffer.mInfo);
                                 }
 
                                 mCodec.releaseOutputBuffer(frameBuffer.mBufferId, false /* render */);

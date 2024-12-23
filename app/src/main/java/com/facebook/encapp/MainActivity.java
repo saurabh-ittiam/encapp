@@ -79,7 +79,7 @@ import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
     private final static String TAG = "encapp.main";
-    private static boolean mStable = false;
+    private static boolean mStable = true;
     private final Object mTestLockObject = new Object();
     int mUIHoldtimeSec = 0;
     boolean mPursuitOver = false;
@@ -1095,10 +1095,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if (test.getConfigure().hasEncode() && test.getConfigure().getEncode() == false) {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceNoEncoder test");
-                    coder = new SurfaceNoEncoder(test, mult);
+                    coder = new SurfaceNoEncoder(test, mult,mVsyncHandler);
                 } else {
                     Log.d(TAG, "[" + test.getCommon().getId() + "] SurfaceEncoder test");
-                    coder = new SurfaceEncoder(test, this, mult);
+                    coder = new SurfaceEncoder(test, this, mult,mVsyncHandler);
                 }
 
             } else {

@@ -1,15 +1,10 @@
 package com.facebook.encapp;
 
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.bitrateModeToString;
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.encoderCapabilitiesToString;
 import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatComparison;
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.mediaFormatToString;
-import static com.facebook.encapp.utils.MediaCodecInfoHelper.profileLevelsToString;
 
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Build;
@@ -27,7 +22,6 @@ import com.facebook.encapp.proto.Test;
 import com.facebook.encapp.utils.FileReader;
 import com.facebook.encapp.utils.FrameInfo;
 import com.facebook.encapp.utils.FrameswapControl;
-import com.facebook.encapp.utils.MediaCodecInfoHelper;
 import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
@@ -41,46 +35,30 @@ import java.util.Dictionary;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
+public class SurfaceTranscoder extends SurfaceEncoder {
     private final String TAG = "encapp.surface_transcoder";
 
     private final SourceReader mSourceReader;
     MediaExtractor mExtractor;
     MediaCodec mDecoder;
     DecoderRuntime mDecoderRuntimeParams;
-    OutputMultiplier mOutputMult = null;
     double mLoopTime = 0;
     int mCurrentLoop = 1;
     long mPtsOffset = 0;
     long mLastPtsUs = -1;
     boolean mNoEncoding = false;
     private FrameswapControl mFrameSwapSurface;
-    private VsyncHandler mVsyncHandler;
-    Object mSyncLock = new Object();
-    long mVsyncTimeNs = 0;
-    long mFirstSynchNs = -1;
     Surface mSurface = null;
     boolean mDone = false;
     Object mStopLock = new Object();
 
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
-        super(test);
-        mOutputMult = multiplier;
+        super(test, null, multiplier, vsyncHandler);
         mSourceReader = new SourceReader();
-        mVsyncHandler = vsyncHandler;
-        mStats = new Statistics("surface encoder", mTest);
     }
-
-    public SurfaceTranscoder(Test test, VsyncHandler vsyncHandler) {
-        super(test);
-        mOutputMult = new OutputMultiplier(vsyncHandler);
-        mSourceReader = new SourceReader();
-        mVsyncHandler = vsyncHandler;
-        mStats = new Statistics("surface encoder", mTest);
-    }
-
 
     public String start() {
+        mStats = new Statistics("surface encoder", mTest);
         if (mTest.getConfigure().hasEncode()) {
             mNoEncoding = !mTest.getConfigure().getEncode();
         }
@@ -95,11 +73,6 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
             mRuntimeParams = mTest.getRuntime();
         if (mTest.hasDecoderRuntime())
             mDecoderRuntimeParams = mTest.getDecoderRuntime();
-
-        checkRealtime();
-        if (mRealtime) {
-            mVsyncHandler.addListener(this);
-        }
 
         mFrameRate = mTest.getConfigure().getFramerate();
         Log.d(TAG, "Realtime = " + mRealtime + ", encoding to " + mFrameRate + " fps");
@@ -200,6 +173,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
             //Use same color settings as the input
             Log.d(TAG, "Check decoder settings");
+            mTest = TestDefinitionHelper.updateEncoderResolution(mTest, width, height);
             format = TestDefinitionHelper.buildMediaFormat(mTest);
             Log.d(TAG, "Check created encoder format");
             logMediaFormat(format);
@@ -256,7 +230,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
             if (!mNoEncoding) {
                 Log.d(TAG, "Create muxer");
-                mMuxer = createMuxer(mCodec, format, false);
+                mMuxer = createMuxer(mCodec, format,false);
 
                 // This is needed.
                 boolean isVP = mCodec.getCodecInfo().getName().toLowerCase(Locale.US).contains(".vp");
@@ -282,9 +256,9 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
-        } catch(Exception e){
-            Log.e(TAG, "Unsupported profile or bitrate mode: " + e.getMessage());
-            return "Failed to configure parameters profile or bitrate mode";
+        } catch (Exception e) {
+            Log.e(TAG, "SurfaceTranscoder start function Error: " + e.getMessage());
+            throw new RuntimeException(e);
         }
         mFrameTimeUsec = calculateFrameTimingUsec(mFrameRate);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
@@ -395,24 +369,23 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         }
                     }
                     setRuntimeParameters(mInFramesCount);
-
                     mDropNext = dropFrame(mInFramesCount);
                     mDropNext |= dropFromDynamicFramerate(mInFramesCount);
                     updateDynamicFramerate(mInFramesCount);
-                    //Check time, if to far off drop frame, minimize the drops so something is show.
+                    //Check time, if to far off drop frame, minimize the drops so something is show (when show is true)
                     long ptsUsec = mPts + (timestamp - (long) mFirstFrameTimestampUsec);
 
-                    mCurrentTimeSec = diffUsec/1000000.0f;
-                    if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
+                    //mCurrentTimeSec = diffUsec/1000000.0f;
+                    if (mRealtime &&  mFirstFrameSystemTimeNsec > 0 && (diffUsec - ptsUsec) > mFrameTimeUsec * 2) {
                         if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
-                            mDropNext = false;
+                            mDropNext = true;
                             mDropcount++;
                         } else {
                             mDropcount = 0;
                         }
                     }
-                    if (false) {
+                    if (mDropNext) {
                         mSkipped++;
                         mDropNext = false;
                         codec.releaseOutputBuffer(index, false);
@@ -422,24 +395,22 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                     }
                 } else {
-                    mCurrentTimeSec = diffUsec/1000000.0f;
+                    //mCurrentTimeSec = diffUsec/1000000.0f;
                     //info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
                     long diff =(diffUsec - timestamp);
                     if (mFirstFrameSystemTimeNsec > 0 && (diffUsec - timestamp) > mFrameTimeUsec * 2) {
-                        long now = SystemClock.elapsedRealtimeNanos();
-                         ;if (mDropcount < mFrameRate) {
+                        if (mDropcount < mFrameRate) {
                             Log.d(TAG, mTest.getCommon().getId() + " - drop frame caused by slow decoder");
                             mDropNext = false;//true;
                             mDropcount++;
                         } else {
                             mDropcount = 0;
-                            info.presentationTimeUs = (long)(mCurrentTimeSec * 1000000);
+                            info.presentationTimeUs = (long)(mCurrentTimeSec * 1e6);
                         }
                     }
                     //mCurrentTimeSec = timestamp/1000000.0;
                     if (mDropNext) {
                         codec.releaseOutputBuffer(index, false);
-
                     } else {
                         mOutputMult.newFrameAvailableInBuffer(codec, index, info);
                     }
@@ -511,9 +482,15 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                     setDecoderRuntimeParameters(mTest, mInFramesCount);
                     // Source time is always what is read
                     long ptsUsec = mExtractor.getSampleTime() + mPtsOffset;
-                    if (mRealtime) {
-                        // Limit the pace of incoming frames to the framerate
-                        sleepUntilNextFrameSynched();
+                    if (size > 0) {
+                        mStats.startDecodingFrame(ptsUsec, size, flags);
+                        try {
+                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
+                        } catch (IllegalStateException ise) {
+                            // Ignore this
+                        }
+                    } else {
+                        mDecoderBuffers.add(index);
                     }
                     if (mFirstFrameTimestampUsec > 0) {
                         runtime -= mFirstFrameTimestampUsec/1000000.0;
@@ -532,33 +509,13 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
                         mLoopTime = mPtsOffset /1000000.0;
                         Log.d(TAG, "*** Loop ended starting " + mCurrentLoop + " - currentTime " + mCurrentTimeSec + " ***");
                         if (doneReading(mTest, mYuvReader, mInFramesCount, runtime, true)) {
-                            flags += MediaCodec.BUFFER_FLAG_END_OF_STREAM;
                             mDone = true;
                         }
-                    }//new
-                    if (size > 0) {
-                        mStats.startDecodingFrame(ptsUsec, size, flags);
-                        try {
-                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
-                            Log.d(TAG, "submitted frame to dec : " + mInFramesCount);
-                        } catch (IllegalStateException ise) {
-                            // Ignore this
-                        }
-                    } else {
-                        mDecoderBuffers.add(index);
                     }
-                    if (size > 0) {
-                        mStats.startDecodingFrame(ptsUsec, size, flags);
-                        try {
-                            mDecoder.queueInputBuffer(index, 0, size, ptsUsec, flags);
-                        } catch (IllegalStateException ise) {
-                            // Ignore this
-                        }
-                    } else {
-                        mDecoderBuffers.add(index);
-                    }
-                    //Log.d(TAG, "Set lastpts = " + ptsUsec/1000 +" ms" + ", ptsOffset = " + mPtsOffset);
                     mLastPtsUs = ptsUsec;
+		    if (mRealtime) {
+			sleepUntilNextFrame();
+		    }
                 }
             }
         }
@@ -571,58 +528,20 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
         }
     }
 
-
-    public  long sleepUntilNextFrameSynched() {
-        if (mFirstSynchNs == -1) {
-            Log.d(TAG, "Set first sync: "+mVsyncTimeNs);
-            mFirstSynchNs = mVsyncTimeNs;
-        }
-        if (mLastPtsUs == -1) {
-            Log.d(TAG,"First time - no wait");
-        } else {
-            //TODO: Fix this, it is broken. Lockup with the loop and growing delay without it.
-            synchronized (mSyncLock) {
-                long startTime = mVsyncTimeNs;
-
-                try {
-                    long videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    //while (videoDiffMs > 0) {
-                        // Wait for next vsync and check time difference again.
-                        mSyncLock.wait(WAIT_TIME_MS);
-                        videoDiffMs = (long) (mLastPtsUs - mCurrentTimeSec * 1000000)/1000;
-                    ///}
-                    mLastTime = mVsyncTimeNs;
-
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        return mVsyncTimeNs;
-    }
-
-
     public void stopAllActivity(){
-        int waitCount = 0;
         synchronized (mStopLock) {
-            //if (mStats.getDecodedFrameCount() > mStats.getEncodedFrameCount()) {
-            while (mStats.getDecodedFrameCount() > mDataWriter.framesWritten) {
+            if (mStats.getDecodedFrameCount() > mStats.getEncodedFrameCount()) {
                 Log.d(TAG, "Give me a sec, waiting for last encodings dec: " + mStats.getDecodedFrameCount() + " > enc: " + mStats.getEncodedFrameCount());
                 try {
                     mStopLock.wait(WAIT_TIME_SHORT_MS);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                waitCount++;
-
-                // If already waited 10 times, just break
-                if(waitCount == 10)
-                    break;
             }
             mDone = true;
             mStats.stop();
             Log.d(TAG, mTest.getCommon().getId() + " - SurfaceTranscoder done - close down");
-            Log.d(TAG, "Close muxer and streams: " + getOutputFilename() + ".mp4");
+            Log.d(TAG, "Close muxer and streams: " + getStatistics().getId());
             if (mMuxer != null) {
                 try {
                     mMuxer.release(); //Release calls stop
@@ -683,7 +602,7 @@ public class SurfaceTranscoder extends SurfaceEncoder implements VsyncListener {
 
             if (mExtractor != null)
                 mExtractor.release();
-            Log.d(TAG, "Stop writer: " + mDataWriter.framesWritten);
+            Log.d(TAG, "Stop writer");
             mDataWriter.stopWriter();
         }
     }

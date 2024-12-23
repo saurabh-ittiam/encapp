@@ -28,6 +28,8 @@ import com.facebook.encapp.utils.OutputMultiplier;
 import com.facebook.encapp.utils.SizeUtils;
 import com.facebook.encapp.utils.Statistics;
 import com.facebook.encapp.utils.TestDefinitionHelper;
+import com.facebook.encapp.utils.VsyncHandler;
+import com.facebook.encapp.utils.VsyncListener;
 import com.facebook.encapp.utils.grafika.Texture2dProgram;
 
 import java.io.IOException;
@@ -40,7 +42,7 @@ import java.util.Locale;
  * Created by jobl on 2018-02-27.
  */
 
-class SurfaceEncoder extends Encoder {
+class SurfaceEncoder extends Encoder implements VsyncListener {
     protected static final String TAG = "encapp.surface_encoder";
 
     Bitmap mBitmap = null;
@@ -55,37 +57,30 @@ class SurfaceEncoder extends Encoder {
     private Allocation mYuvOut;
     private ScriptIntrinsicYuvToRGB yuvToRgbIntrinsic;
     private FrameswapControl mFrameSwapSurface;
+    protected VsyncHandler mVsyncHandler;
+    Object mSyncLock = new Object();
+    long mVsyncTimeNs = 0;
+    long mFirstSynchNs = -1;
 
-    static{
-        try {
-            System.loadLibrary("x264");
-        } catch (UnsatisfiedLinkError e) {
-            Log.e(TAG, "Failed to load x264 library: " + e.getMessage());
-        }
-    }
-
-    public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier) {
+    public SurfaceEncoder(Test test, Context context, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test);
         mOutputMult = multiplier;
         mContext = context;
-        mStats = new Statistics("raw encoder", mTest);
+        mVsyncHandler = vsyncHandler;
+        checkRealtime();
+        if (mRealtime) {
+            mVsyncHandler.addListener(this);
+        }
+
     }
 
-    public SurfaceEncoder(Test test, Context context) {
-        super(test);
-        mContext = context;
-        mStats = new Statistics("raw encoder", mTest);
-    }
-
-    public SurfaceEncoder(Test test){
-        super(test);
-    }
     public String start() {
         return encode(null);
     }
 
     public String encode(
             Object synchStart) {
+        mStats = new Statistics("raw encoder", mTest);
         mStable = false;
         mKeyFrameBundle = new Bundle();
         mKeyFrameBundle.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
@@ -125,7 +120,6 @@ class SurfaceEncoder extends Encoder {
             }
         }
 
-        checkRealtime();
 
         if (!mIsRgbaSource && !mIsCameraSource) {
             // if we are getting a YUV source, we need to convert it to RGBA
@@ -206,9 +200,9 @@ class SurfaceEncoder extends Encoder {
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
             return "Failed to create codec";
-        } catch(Exception e){
-            Log.e(TAG, "Unsupported profile or bitrate mode " + e.getMessage());
-            return "Failed to configure parameters";
+        } catch (Exception e) {
+            Log.e(TAG, "Configure failed SurfaceEncoder encode: " + e.getMessage());
+            throw new RuntimeException(e);
         }
 
         try {
@@ -220,7 +214,7 @@ class SurfaceEncoder extends Encoder {
         }
 
         Log.d(TAG, "Create muxer");
-        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(), true);
+        mMuxer = createMuxer(mCodec, mCodec.getOutputFormat(),false);
 
 
         // This is needed.
@@ -447,17 +441,30 @@ class SurfaceEncoder extends Encoder {
                 // Without it the extractor will read as fast a possible
                 // until no buffers are available.
                 mRealtime = true;
-            } else {
-                if (mOutputMult != null)
-                    mOutputMult.setRealtime(false);
             }
         }
+        if (!mRealtime) {
+            if (mOutputMult != null) {
+                Log.d(TAG, "Outputmultiplier will work in non realtime mode");
+                mOutputMult.setRealtime(false);
+            }
+        }
+
+        Log.d(TAG, "Surface encoder will run in realtime mode:" + mRealtime);
     }
 
     private void setupOutputMult(int width, int height) {
         if (mOutputMult != null) {
             mOutputMult.setName("SE_" + mTest.getInput().getFilepath() + "_enc-" + mTest.getConfigure().getCodec());
             mOutputMult.confirmSize(width, height);
+
+            // Need to update outputmulti and configure working mode.
+            if (!mRealtime) {
+                if (mOutputMult != null) {
+                    Log.d(TAG, "Outputmultiplier will work in non realtime mode");
+                    mOutputMult.setRealtime(false);
+                }
+            }
         }
     }
 
@@ -500,9 +507,6 @@ class SurfaceEncoder extends Encoder {
             Log.d(TAG, "***************** FAILED READING SURFACE ENCODER ******************");
             return -1;
         }
-       /* if (mRealtime) {
-            sleepUntilNextFrame(mRefFrameTime);
-        }*/
         mInFramesCount++;
         return read;
     }
@@ -517,5 +521,13 @@ class SurfaceEncoder extends Encoder {
 
     public void release() {
         mOutputMult.stopAndRelease();
+    }
+
+    @Override
+    public void vsync(long frameTimeNs) {
+        synchronized (mSyncLock) {
+            mVsyncTimeNs = frameTimeNs;
+            mSyncLock.notifyAll();
+        }
     }
 }
