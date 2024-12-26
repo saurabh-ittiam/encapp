@@ -535,6 +535,19 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
     if host_filepath[-6] == ".pbtxt":
         return False
 
+    ret, stdout, _ = run_cmd(
+        f"adb -s {serial} shell ls /sdcard/{os.path.basename(host_filepath)}", debug
+    )
+    if ret == True:
+        print(f"{os.path.basename(host_filepath)} file present in device")
+        return True
+    elif ret == False:
+        print(f"{os.path.basename(host_filepath)} file not in device")
+        return False
+    else:
+        print(f'error: checking "{os.path.basename(host_filepath)}": {stdout}')
+        return False
+
     if USE_IDB and fast_copy:
         # TODO: fix
         basename = os.path.basename(device_filepath)
@@ -542,15 +555,16 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
         _, stdout, _ = run_cmd(cmd, debug)
         output_files = re.findall(f"{basename}", stdout, re.MULTILINE)
         return len(output_files) > 0
+
     # 1. check the size
-    device_filesize = get_device_size(serial, device_filepath, debug)
-    if device_filesize == -1:
-        # file not in device
-        return False
-    host_filesize = os.path.getsize(host_filepath)
-    if device_filesize != host_filesize:
-        # files have different sizes
-        return False
+    # device_filesize = get_device_size(serial, device_filepath, debug)
+    # if device_filesize == -1:
+    #     # file not in device
+    #     return False
+    # host_filesize = os.path.getsize(host_filepath)
+    # if device_filesize != host_filesize:
+    #     # files have different sizes
+    #     return False
     if fast_copy:
         # optimistic copy: assume same size means same file without checking
         # the hash
@@ -558,9 +572,9 @@ def file_already_in_device(host_filepath, serial, device_filepath, fast_copy, de
     # 2. check the hash
     device_filehash = get_device_hash(serial, device_filepath, debug)
     host_filehash = get_host_hash(host_filepath, debug)
-    if device_filehash != host_filehash:
-        # files have different hashes
-        return False
+    # if device_filehash != host_filehash:
+    #     # files have different hashes
+    #     return False
     return True
 
 
@@ -592,6 +606,7 @@ def push_file_to_device(filepath, serial, device_workdir, fast_copy, debug):
         )
         if not ret:
             print(f'error: copying "{filepath}": {stdout}')
+        print(f"Copied file to device work dir: {device_workdir}")
     return ret
 
 

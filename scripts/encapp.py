@@ -288,9 +288,12 @@ def collect_results(
         # remove the file on the device
         # Too slow at least on ios, remove everyting as a last all instead.
         if not encapp_tool.adb_cmds.USE_IDB:
-            cmd = f"adb -s {serial} shell rm {device_workdir}/{file}"
-            cmd = f"adb -s {serial} shell rm {device_workdir}/{protobuf_txt_filepath}"
-        encapp_tool.adb_cmds.run_cmd(cmd, debug)
+            cmd1 = f"adb -s {serial} shell rm {device_workdir}/{file}"
+            cmd2 = f"adb -s {serial} shell rm {protobuf_txt_filepath}"
+            encapp_tool.adb_cmds.run_cmd(cmd1, debug)
+            encapp_tool.adb_cmds.run_cmd(cmd2, debug)
+            #print(f"{protobuf_txt_filepath} Deleted pbtxt from device")
+
         # append results file (json files) to final results
         if os.path.exists(file):
             if file.strip().endswith(".json"):
@@ -324,7 +327,7 @@ def collect_results(
     if encapp_tool.adb_cmds.USE_IDB:
         cmd = f"idb file pull {device_workdir}/{protobuf_txt_filepath} {local_workdir} --udid {serial} --bundle-id {encapp_tool.adb_cmds.IDB_BUNDLE_ID}"
     else:
-        cmd = f"adb -s {serial} shell rm " f"{device_workdir}/{protobuf_txt_filepath}"
+        cmd = f"adb -s {serial} shell rm " f"{protobuf_txt_filepath}"
     encapp_tool.adb_cmds.run_cmd(cmd, debug)
     if debug > 0:
         print(f"results collect: {result_json}")
@@ -543,7 +546,7 @@ def read_and_update_proto(protobuf_txt_filepath, local_workdir, options):
     return test_suite, files_to_push, protobuf_txt_filepath
 
 def run_codec_tests_file(
-    protobuf_txt_filepath, model, serial, local_workdir, options, debug
+        protobuf_txt_filepath, model, serial, local_workdir, options, debug
 ):
     if debug > 0:
         print(f"reading test: {protobuf_txt_filepath}")
@@ -592,12 +595,12 @@ def run_codec_tests_file(
         if debug > 0:
             print("Remove other pbtxt files")
         files_to_push = {fl for fl in files_to_push if not fl.endswith(".pbtxt")}
-        protobuf_txt_filepath = f"{local_workdir}/{test.common.id}_aggr.pbtxt"
-        with open(protobuf_txt_filepath, "w") as f:
-            f.write(text_format.MessageToString(test_suite))
-        if debug > 0:
-            print(f"add {protobuf_txt_filepath}")
-        files_to_push |= {protobuf_txt_filepath}
+        # protobuf_txt_filepath = f"{local_workdir}/{test.common.id}_aggr.pbtxt"
+        # with open(protobuf_txt_filepath, "w") as f:
+        #     f.write(text_format.MessageToString(test_suite))
+        # if debug > 0:
+        #     print(f"add {protobuf_txt_filepath}")
+        # files_to_push |= {protobuf_txt_filepath}
         if options.dry_run:
             # Do nothing here
             if debug:
@@ -1124,12 +1127,11 @@ def run_codec_tests(
             files = set()
             get_media_files(test, files)
             for filepath in files:
-                print(f"Copy file to device work dir: {device_workdir}")
                 if not encapp_tool.adb_cmds.push_file_to_device(
                     f"{mediastore}/{filepath}", serial, device_workdir, fast_copy, debug
                 ):
                     abort_test(local_workdir, f"Error copying {filepath} to {serial}")
-                print(f"Push test defs: lw = {local_workdir}")
+                # print(f"Push test defs: lw = {local_workdir}")
             if not encapp_tool.adb_cmds.push_file_to_device(
                 f"{local_workdir}/{test.common.id}.pbtxt",
                 serial,
@@ -1174,7 +1176,13 @@ def run_codec_tests(
                     local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
                 )
             )
-
+            print("Remove pbtxt from local workdir")
+            local_pbtxt = os.path.join(f'{local_workdir}/{test.common.id}.pbtxt')
+            if local_pbtxt:
+                os.remove(local_pbtxt)
+                print(f"{local_pbtxt} deleted from {local_workdir}")
+            else:
+                print(f"Error deleting {local_pbtxt} from {local_workdir}")
     else:
         # (b) one pbtxt for all tests
         # push all the files to the device workdir
@@ -1235,6 +1243,14 @@ def run_codec_tests(
                 local_workdir, protobuf_txt_filepath, serial, device_workdir, debug, process_cpu_usage
             )
         )
+        print("Remove pbtxt from local workdir")
+        if protobuf_txt_filepath:
+            cmd = f'os.remove({protobuf_txt_filepath})'
+        ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(cmd)
+        if ret == True:
+            print(f"{protobuf_txt_filepath} deleted from {local_workdir}")
+        else:
+            print(f"Error deleting {protobuf_txt_filepath} from {local_workdir}")
     return collected_results
 
 def start_cpu_monitoring(serial, cpu_usage_file, debug):
@@ -1243,7 +1259,7 @@ def start_cpu_monitoring(serial, cpu_usage_file, debug):
     monitor_thread.start()
     return stop_event, monitor_thread, cpu_usage_file
 def capture_cpu_usage(serial, cpu_usage_file, debug, stop_event):
-    interval = 0.5    
+    interval = 0.2
     with open(cpu_usage_file, 'a') as f:
         while not stop_event.is_set():
             ret, stdout, stderr = encapp_tool.adb_cmds.run_cmd(f'adb -s {serial} shell top -n 1')
