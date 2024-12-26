@@ -6,7 +6,7 @@ android {
 
     defaultConfig {
         applicationId "com.facebook.encapp"
-        minSdkVersion 31
+        minSdkVersion 30
         targetSdkVersion 33
         versionCode 1
         versionName "1.15"
