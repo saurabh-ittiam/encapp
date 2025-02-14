@@ -55,10 +55,10 @@ public class Statistics {
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
 
-    int mstartbattery;
-    int mendbattery;
+    long mstartbattery;
+    long mendbattery;
     double mVoltage;
-    int mbatteryDifference;
+    long mbatteryDifference;
     double mtotalEnergyConsumption;
     long mloopbacks = 0;
     long finalaccumulated = 0;
@@ -277,7 +277,7 @@ public class Statistics {
         mStatus = status;
     }
 
-    public void BatteryTest(int startbattery,int endbattery,double Voltage) {
+    public void BatteryTest(long startbattery,long endbattery,double Voltage) {
         mstartbattery = startbattery; //In MicroAmps
         mendbattery = endbattery; //In MicroAmps
         if(Voltage > 10) {

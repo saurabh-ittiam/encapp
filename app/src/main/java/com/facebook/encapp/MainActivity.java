@@ -104,8 +104,10 @@ public class MainActivity extends AppCompatActivity {
     static int voltage = -1;
     int temp = -1;
     String mp4OutputFile = "";
-    int startbattery;
-    int endbattery;
+    long startbattery;
+    long endbattery;
+    long startbatteryalter;
+    long endbatteryalter;
     long mLoopback = 0;
     long accumulatedtime = 0;
     TestSuite testMessage = null;
@@ -371,10 +373,12 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     startbatteryInMicroAmps[0] = getChargeCounter();
-                    startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
+//                    startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     startbattery = startbatteryInMicroAmps[0];
-                    endBatteryTextView.setText("After batteryInMicroAmps: ");
-                    batteryStatsTextView.setText("Battery difference: ");
+                    startbatteryalter = getChargeCountAlternative();
+                    Log.d(TAG, "startbattery value : " + startbattery);
+//                    endBatteryTextView.setText("After batteryInMicroAmps: ");
+//                    batteryStatsTextView.setText("Battery difference: ");
                     testStatusTextView.setText("Test is running...");
 
                     setScreenBrightness(1);
@@ -477,6 +481,8 @@ public class MainActivity extends AppCompatActivity {
                                 for(Test test : testMessage.getTestList()) {
                                     PerformTest(test).join();
                                     startbattery = getChargeCounter();
+                                    startbatteryalter = getChargeCountAlternative();
+                                    Log.d(TAG, "startbattery value : " + startbattery);
                                 }
                             }
                             else {
@@ -490,8 +496,9 @@ public class MainActivity extends AppCompatActivity {
 
                         runOnUiThread(() -> {
 
-                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbattery);
-                            batteryStatsTextView.setText("Battery difference: " + (startbattery - endbattery));
+//                            long Total_battery_diff = (startbattery - endbattery);
+//                            endBatteryTextView.setText("After batteryInMicroAmps: " + endbattery);
+//                            batteryStatsTextView.setText("Total Battery difference: " + Total_battery_diff);
                             testStatusTextView.setText("Test completed.");
                             setScreenBrightness(255);
 //                            saveResultsToFile(startbatteryInMicroAmps[0], endbatteryInMicroAmps[0]);
@@ -543,10 +550,65 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private double getBatteryCapacity(Context context) {
+        Object powerProfile;
+        double batteryCapacity = 0;
+        try {
+            powerProfile = Class.forName("com.android.internal.os.PowerProfile")
+                    .getConstructor(Context.class)
+                    .newInstance(context);
+            batteryCapacity = (double) Class.forName("com.android.internal.os.PowerProfile")
+                    .getMethod("getBatteryCapacity")
+                    .invoke(powerProfile);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return batteryCapacity; // Returns in mAh
+    }
+
     private int getChargeCounter() {
         BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
         if (batteryManager != null) {
             return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        }
+        return -1;
+    }
+
+    private long getChargeCountAlternative() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            int Battery_percentage = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            Log.d(TAG, "Battery Capacity : " + Battery_percentage);
+            double batteryCapacity = getBatteryCapacity(this);
+
+            Log.d(TAG, "batteryCapacity : " + batteryCapacity);
+
+            if(Battery_percentage == Integer.MIN_VALUE) {
+                IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+                Intent batteryStatus = registerReceiver(null, filter);
+
+                if(batteryStatus != null) {
+                    int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+                    if (level >= 0 && scale > 0) {  // Ensure valid values
+                        float batteryPct = (level / (float) scale) * 100;
+                        Log.d("BatteryTest", "Battery Percentage: " + batteryPct + "%");
+                        Battery_percentage = (int)batteryPct;
+                    } else {
+                        Log.e("BatteryTest", "Failed to retrieve battery percentage.");
+                        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+                    }
+                } else {
+                    Log.e("BatteryTest", "Battery Intent is null.");
+                    return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+                }
+            }
+
+            long estimatedCharge = (long) ((batteryCapacity * Battery_percentage / 100) * 1000);
+
+            Log.d(TAG, "estimatedCharge : "+estimatedCharge);
+            return estimatedCharge;
         }
         return -1;
     }
@@ -1178,6 +1240,12 @@ public class MainActivity extends AppCompatActivity {
                     stats.setStatus(status);
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                     endbattery = getChargeCounter();
+                    endbatteryalter = getChargeCountAlternative();
+                    if((startbattery - endbattery) <= 0) {
+                        endbattery = endbatteryalter;
+                        startbattery = startbatteryalter;
+                    }
+                    Log.d(TAG, "Endbattery value : " + endbattery);
 //                    stats.LoopbackData(mLoopback, accumulatedtime);
                     stats.BatteryTest(startbattery,endbattery,voltage);
                     try {
