@@ -14,6 +14,8 @@ import com.google.protobuf.util.JsonFormat;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.google.gson.Gson;
+import com.google.gson.stream.JsonWriter;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -580,14 +582,25 @@ public class Statistics {
             }
             gpuData.put("gpu_clock_freq", jsonArray);
             json.put("gpu_data", gpuData);
-            writer.write(json.toString(2));
+//            writer.write(json.toString(2));
 
+            JsonWriter jsonWriter = new JsonWriter(writer);
+            jsonWriter.setIndent("  ");
+
+            Gson gson = new Gson();
+
+            gson.toJson(json, JSONObject.class, jsonWriter);
+            jsonWriter.close();
 
         } catch (JSONException e) {
             Log.e(TAG, "Failed writing stats");
             e.printStackTrace();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed writing stats");
+            e.printStackTrace();
         }
         Log.d(TAG, "Done written stats report: " + mId);
+        writer.close();
     }
 
 }

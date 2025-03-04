@@ -1241,16 +1241,16 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                     endbattery = getChargeCounter();
                     endbatteryalter = getChargeCountAlternative();
-                    if((startbattery - endbattery) <= 0) {
-                        endbattery = endbatteryalter;
-                        startbattery = startbatteryalter;
-                    }
+//                    if((startbattery - endbattery) <= 0) {
+//                        endbattery = endbatteryalter;
+//                        startbattery = startbatteryalter;
+//                    }
                     Log.d(TAG, "Endbattery value : " + endbattery);
 //                    stats.LoopbackData(mLoopback, accumulatedtime);
-                    stats.BatteryTest(startbattery,endbattery,voltage);
+                    stats.BatteryTest(startbatteryalter,endbatteryalter,voltage);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
-                        FileWriter fw = new FileWriter(fullFilename, false);
+                        FileWriter fw = new FileWriter(fullFilename, true);
                         stats.writeJSON(fw);
                         fw.close();
                     } catch (IOException e) {
