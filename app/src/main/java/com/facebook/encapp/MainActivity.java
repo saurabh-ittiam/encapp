@@ -78,6 +78,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
+    private static MainActivity instance;
     private final static String TAG = "encapp.main";
     private static boolean mStable = true;
     private final Object mTestLockObject = new Object();
@@ -105,7 +106,11 @@ public class MainActivity extends AppCompatActivity {
     int temp = -1;
     String mp4OutputFile = "";
     long startbattery;
+    int startvoltage;
+    int startavgcurrent;
     long endbattery;
+    int endvoltage;
+    int endavgcurrent;
     long startbatteryalter;
     long endbatteryalter;
     long mLoopback = 0;
@@ -247,6 +252,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        instance = this;
         mVsyncHandler = new VsyncHandler();
         mVsyncHandler.start();
         //setContentView(R.layout.activity_main);
@@ -375,6 +381,8 @@ public class MainActivity extends AppCompatActivity {
                     startbatteryInMicroAmps[0] = getChargeCounter();
 //                    startBatteryTextView.setText("Before batteryInMicroAmps: " + startbatteryInMicroAmps[0]);
                     startbattery = startbatteryInMicroAmps[0];
+                    startvoltage = getBatteryVoltage();
+                    startavgcurrent = getAvgCurrent();
                     startbatteryalter = getChargeCountAlternative();
                     Log.d(TAG, "startbattery value : " + startbattery);
 //                    endBatteryTextView.setText("After batteryInMicroAmps: ");
@@ -525,6 +533,8 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    public static Context getAppContext() { return instance.getApplicationContext(); }
+
     private void setScreenBrightness(int brightnessLevel) {
         try {
             // Ensure the brightness level is within the valid range
@@ -572,6 +582,24 @@ public class MainActivity extends AppCompatActivity {
             return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
         }
         return -1;
+    }
+
+    private int getAvgCurrent() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE);
+        }
+        return -1;
+    }
+
+    private int getBatteryVoltage() {
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, ifilter);
+
+        if (batteryStatus != null) {
+            return batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1); // in mV
+        }
+        return -1; // fallback if not available
     }
 
     private long getChargeCountAlternative() {
@@ -1240,6 +1268,8 @@ public class MainActivity extends AppCompatActivity {
                     stats.setStatus(status);
                     Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                     endbattery = getChargeCounter();
+                    endvoltage = getBatteryVoltage();
+                    endavgcurrent = getAvgCurrent();
                     endbatteryalter = getChargeCountAlternative();
 //                    if((startbattery - endbattery) <= 0) {
 //                        endbattery = endbatteryalter;
@@ -1247,7 +1277,8 @@ public class MainActivity extends AppCompatActivity {
 //                    }
                     Log.d(TAG, "Endbattery value : " + endbattery);
 //                    stats.LoopbackData(mLoopback, accumulatedtime);
-                    stats.BatteryTest(startbatteryalter,endbatteryalter,voltage);
+//                    stats.BatteryTest(startbatteryalter,endbatteryalter,voltage);
+                    stats.BatteryTest(startbattery,endbattery,voltage,startvoltage,endvoltage,startavgcurrent,endavgcurrent);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, true);

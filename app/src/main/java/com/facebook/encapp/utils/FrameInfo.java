@@ -1,5 +1,12 @@
 package com.facebook.encapp.utils;
+
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
 import android.os.SystemClock;
+
+import com.facebook.encapp.MainActivity;
 
 import java.util.Dictionary;
 
@@ -12,6 +19,9 @@ public class FrameInfo {
     boolean mIsIframe;
     int mFlags;
     int mOriginalFrame;
+
+    int mBatteryVoltage = -1;
+    int mAverageCurrent = -1;
 
     Dictionary<String, Object> mInfo;
 
@@ -78,4 +88,27 @@ public class FrameInfo {
         mInfo = info;
     }
 
+    public void setAverageCurrent() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mAverageCurrent = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mAverageCurrent = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
+                : -1;
+    }
+
+    public void setBatteryVoltage() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryVoltage = -1; return; }
+
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent status = ctx.registerReceiver(null, filter);
+        mBatteryVoltage = (status != null)
+                ? status.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+                : -1;
+    }
+
+    public int getBatteryVoltage() { return mBatteryVoltage; }
+    public int getAverageCurrent() { return mAverageCurrent; }
 }

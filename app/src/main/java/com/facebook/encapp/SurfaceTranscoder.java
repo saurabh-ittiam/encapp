@@ -34,6 +34,11 @@ import java.nio.ByteBuffer;
 import java.util.Dictionary;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class SurfaceTranscoder extends SurfaceEncoder {
     private final String TAG = "encapp.surface_transcoder";
@@ -55,6 +60,22 @@ public class SurfaceTranscoder extends SurfaceEncoder {
     public SurfaceTranscoder(Test test, OutputMultiplier multiplier, VsyncHandler vsyncHandler) {
         super(test, null, multiplier, vsyncHandler);
         mSourceReader = new SourceReader();
+    }
+
+    public MediaCodec createDecoderWithTimeout(String mime, long timeoutMs) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<MediaCodec> future = executor.submit(() -> MediaCodec.createDecoderByType(mime));
+
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS); // Wait for codec creation
+        } catch (TimeoutException e) {
+            future.cancel(true); // Cancel the task if it takes too long
+            throw new Exception("Decoder creation timed out");
+        } catch (Exception e) {
+            throw new Exception("Decoder creation failed: " + e.getMessage());
+        } finally {
+            executor.shutdown();
+        }
     }
 
     public String start() {
@@ -112,12 +133,18 @@ public class SurfaceTranscoder extends SurfaceEncoder {
                 mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
             } else {
                 Log.d(TAG, "Create decoder by type: " + inputFormat.getString(MediaFormat.KEY_MIME));
-                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+//                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+
+                String mime = inputFormat.getString(MediaFormat.KEY_MIME);
+                mDecoder = createDecoderWithTimeout(mime, 20000);
                 Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
             }
         } catch (IOException e) {
             mExtractor.release();
             e.printStackTrace();
+            return "Failed to create decoder";
+        } catch (Exception e) {
+            Log.e("Decoder", "Error: " + e.getMessage());
             return "Failed to create decoder";
         }
         mTest = TestDefinitionHelper.updateInputSettings(mTest, inputFormat);
@@ -441,6 +468,9 @@ public class SurfaceTranscoder extends SurfaceEncoder {
         public void run() {
             Dictionary<String, Object> latestFrameChanges;
             Log.d(TAG, "Start Source reader.");
+            try {
+
+
             while (!mDone) {
                 while (mDecoderBuffers.size() > 0 && !mDone) {
                     if (mInFramesCount % 100 == 0 && MainActivity.isStable()) {
@@ -517,6 +547,8 @@ public class SurfaceTranscoder extends SurfaceEncoder {
 			sleepUntilNextFrame();
 		    }
                 }
+            } } catch (Exception e) {
+                Log.e(TAG,"Error Sampledata : " + e.getMessage());
             }
         }
 

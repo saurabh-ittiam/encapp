@@ -33,6 +33,11 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Dictionary;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 class BufferTranscoder extends Encoder {
     protected static final String TAG = "encapp.Buffer_transcoder";
@@ -216,6 +221,22 @@ class BufferTranscoder extends Encoder {
         }
     }
 
+    public MediaCodec createDecoderWithTimeout(String mime, long timeoutMs) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<MediaCodec> future = executor.submit(() -> MediaCodec.createDecoderByType(mime));
+
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS); // Wait for codec creation
+        } catch (TimeoutException e) {
+            future.cancel(true); // Cancel the task if it takes too long
+            throw new Exception("Decoder creation timed out");
+        } catch (Exception e) {
+            throw new Exception("Decoder creation failed: " + e.getMessage());
+        } finally {
+            executor.shutdown();
+        }
+    }
+
     public String start() {
         Log.d(TAG,"** Buffer transcoding - " + mTest.getCommon().getDescription());
 
@@ -274,7 +295,9 @@ class BufferTranscoder extends Encoder {
                 mDecoder = MediaCodec.createByCodecName(mTest.getDecoderConfigure().getCodec());
             } else {
                 Log.d(TAG, "Create decoder by mime: " + inputFormat.getString(MediaFormat.KEY_MIME));
-                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+//                mDecoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME));
+                String mime = inputFormat.getString(MediaFormat.KEY_MIME);
+                mDecoder = createDecoderWithTimeout(mime, 20000);
                 Log.d(TAG, "Will create " + mDecoder.getCodecInfo().getName());
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -312,6 +335,9 @@ class BufferTranscoder extends Encoder {
             return "Failed to create decoder";
         } catch (MediaCodec.CodecException cex) {
             Log.e(TAG, "Configure failed: " + cex.getMessage());
+            return "Failed to create decoder";
+        } catch (Exception e) {
+            Log.e("Decoder", "Error: " + e.getMessage());
             return "Failed to create decoder";
         }
 

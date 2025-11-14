@@ -56,10 +56,16 @@ public class Statistics {
     private String mAppVersion = "";
     private boolean mIsEncoderHw = false;
     private boolean mIsDecoderHw = false;
+    private static int sFrameCounter = 0;
+    private static float frameRate = -1f;
 
     long mstartbattery;
     long mendbattery;
     double mVoltage;
+    double mstartvoltage;
+    double mendvoltage;
+    int mstartavgcurrent;
+    int mendavgcurrent;
     long mbatteryDifference;
     double mtotalEnergyConsumption;
     long mloopbacks = 0;
@@ -181,6 +187,31 @@ public class Statistics {
 
     public void startEncodingFrame(long pts, int originalFrame) {
         FrameInfo frame = new FrameInfo(pts, originalFrame);
+        try {
+            if(frameRate == -1) {
+                JSONObject settings = getSettingsFromMediaFormat(mDecoderMediaFormat);
+                JSONObject encoderSettings = getSettingsFromMediaFormat(mEncoderMediaFormat);
+//                Log.d(TAG, "Statistics settings : " + settings);
+                if (settings.has("frame-rate")) {
+                    frameRate = (float) settings.getDouble("frame-rate");
+                } else if(encoderSettings.has("frame-rate")){
+                    frameRate = (float) encoderSettings.getDouble("frame-rate");
+                } else {
+                    frameRate = -1f;
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+            frameRate = -1f;
+        }
+        sFrameCounter++;
+//        Log.d(TAG, "sFrameCount : " + sFrameCounter);
+//        Log.d(TAG, "sFrameRate : " + frameRate);
+        if(sFrameCounter == Math.ceil(frameRate)) {
+            frame.setAverageCurrent();
+            frame.setBatteryVoltage();
+            sFrameCounter = 0;
+        }
         frame.start();
         mEncodingFrames.add(frame);
         mEncodingProcessingFrames += 1;
@@ -279,14 +310,28 @@ public class Statistics {
         mStatus = status;
     }
 
-    public void BatteryTest(long startbattery,long endbattery,double Voltage) {
+    public void BatteryTest(long startbattery,long endbattery,double Voltage, double StartVoltage, double EndVoltage, int startAvgCurrent, int endAvgCurrent) {
         mstartbattery = startbattery; //In MicroAmps
         mendbattery = endbattery; //In MicroAmps
+        mstartavgcurrent = startAvgCurrent;
+        mendavgcurrent = endAvgCurrent;
         if(Voltage > 10) {
             mVoltage = Voltage/1000; //In Volts
         }
         else {
             mVoltage = Voltage;
+        }
+        if(StartVoltage > 10) {
+            mstartvoltage = StartVoltage/1000;
+        }
+        else {
+            mstartvoltage = StartVoltage;
+        }
+        if(EndVoltage > 10) {
+            mendvoltage = EndVoltage/1000;
+        }
+        else {
+            mendvoltage = EndVoltage;
         }
 //        mVoltage = Voltage/1000; //In Volts
         mbatteryDifference = startbattery - endbattery; //In MicroAmps
@@ -424,6 +469,10 @@ public class Statistics {
             JSONObject batteryData = new JSONObject();
             batteryData.put("Start Battery (In MicroAmps)", mstartbattery);
             batteryData.put("End Battery (In MicroAmps)",mendbattery);
+            batteryData.put("StartVoltage", mstartvoltage);
+            batteryData.put("EndVoltage:",mendvoltage);
+            batteryData.put("StartAvgCurrent:",mstartavgcurrent);
+            batteryData.put("EndAvgCurrent:",mendavgcurrent);
             batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
             batteryData.put("Voltage (In Volts)",mVoltage);
             batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
@@ -493,6 +542,8 @@ public class Statistics {
                 }
                 obj.put("starttime", info.getStartTime());
                 obj.put("stoptime", info.getStopTime());
+                obj.put("avgcurrent", info.getAverageCurrent());
+                obj.put("currentvoltage", info.getBatteryVoltage());
                 Dictionary<String, Object> dict = info.getInfo();
                 if (dict != null) {
                     Enumeration<String> keys = dict.keys();
@@ -600,6 +651,7 @@ public class Statistics {
             e.printStackTrace();
         }
         Log.d(TAG, "Done written stats report: " + mId);
+        sFrameCounter = 0;
         writer.close();
     }
 
