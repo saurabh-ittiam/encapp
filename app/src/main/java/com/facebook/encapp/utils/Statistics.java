@@ -66,6 +66,14 @@ public class Statistics {
     double mendvoltage;
     int mstartavgcurrent;
     int mendavgcurrent;
+    int startbatterycapacity;
+    int endbatterycapacity;
+    int startchargecounter;
+    int endchargecounter;
+    int startcurrentnow;
+    int endcurrentnow;
+    long startenergycounter;
+    long endenergycounter;
     long mbatteryDifference;
     double mtotalEnergyConsumption;
     long mloopbacks = 0;
@@ -210,6 +218,10 @@ public class Statistics {
         if(sFrameCounter == Math.ceil(frameRate)) {
             frame.setAverageCurrent();
             frame.setBatteryVoltage();
+            frame.setBatteryCapacity();
+            frame.setBatteryChargeCounter();
+            frame.setBatteryCurrentNow();
+            frame.setBatteryEnergyCounter();
             sFrameCounter = 0;
         }
         frame.start();
@@ -310,11 +322,19 @@ public class Statistics {
         mStatus = status;
     }
 
-    public void BatteryTest(long startbattery,long endbattery,double Voltage, double StartVoltage, double EndVoltage, int startAvgCurrent, int endAvgCurrent) {
+    public void BatteryTest(long startbattery,long endbattery,double Voltage, double StartVoltage, double EndVoltage, int startAvgCurrent, int endAvgCurrent, int startBatteryCapacity, int endBatteryCapacity, int startChargeCounter, int endChargeCounter, int startCurrentNow, int endCurrentNow, long startEnergyCounter, long endEnergyCounter) {
         mstartbattery = startbattery; //In MicroAmps
         mendbattery = endbattery; //In MicroAmps
         mstartavgcurrent = startAvgCurrent;
         mendavgcurrent = endAvgCurrent;
+        startbatterycapacity = startBatteryCapacity;
+        endbatterycapacity = endBatteryCapacity;
+        startchargecounter = startChargeCounter;
+        endchargecounter = endChargeCounter;
+        startcurrentnow = startCurrentNow;
+        endcurrentnow = endCurrentNow;
+        startenergycounter = startEnergyCounter;
+        endenergycounter = endEnergyCounter;
         if(Voltage > 10) {
             mVoltage = Voltage/1000; //In Volts
         }
@@ -473,6 +493,14 @@ public class Statistics {
             batteryData.put("EndVoltage:",mendvoltage);
             batteryData.put("StartAvgCurrent:",mstartavgcurrent);
             batteryData.put("EndAvgCurrent:",mendavgcurrent);
+            batteryData.put("StartBatteryCapacity:",startbatterycapacity);
+            batteryData.put("EndBatteryCapacity:",endbatterycapacity);
+            batteryData.put("StartChargeCounter:",startchargecounter);
+            batteryData.put("EndChargeCounter:",endchargecounter);
+            batteryData.put("StartCurrentNow:",startcurrentnow);
+            batteryData.put("EndCurrentNow:",endcurrentnow);
+            batteryData.put("StartEnergyCounter:",startenergycounter);
+            batteryData.put("EndEnergyCounter:",endenergycounter);
             batteryData.put("Battery Difference (In MicroAmps)",mbatteryDifference);
             batteryData.put("Voltage (In Volts)",mVoltage);
             batteryData.put("Total Energy Consumption (In microwatts)",mtotalEnergyConsumption);
@@ -544,6 +572,11 @@ public class Statistics {
                 obj.put("stoptime", info.getStopTime());
                 obj.put("avgcurrent", info.getAverageCurrent());
                 obj.put("currentvoltage", info.getBatteryVoltage());
+                obj.put("BatteryCapacity", info.getBatteryCapacity());
+                obj.put("BatteryChargeCounter", info.getBatteryChargeCounter());
+                obj.put("BatteryCurrentNow", info.getBatteryCurrentNow());
+                obj.put("BatteryEnergyCounter", info.getBatteryEnergyCounter());
+
                 Dictionary<String, Object> dict = info.getInfo();
                 if (dict != null) {
                     Enumeration<String> keys = dict.keys();

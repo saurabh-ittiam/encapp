@@ -113,6 +113,14 @@ public class MainActivity extends AppCompatActivity {
     int endavgcurrent;
     long startbatteryalter;
     long endbatteryalter;
+    int startbatterycapacity;
+    int endbatterycapacity;
+    int startchargecounter;
+    int endchargecounter;
+    int startcurrentnow;
+    int endcurrentnow;
+    long startenergycounter;
+    long endenergycounter;
     long mLoopback = 0;
     long accumulatedtime = 0;
     TestSuite testMessage = null;
@@ -383,6 +391,10 @@ public class MainActivity extends AppCompatActivity {
                     startbattery = startbatteryInMicroAmps[0];
                     startvoltage = getBatteryVoltage();
                     startavgcurrent = getAvgCurrent();
+                    startbatterycapacity = getBatteryPropertyCapacity();
+                    startchargecounter = getBatteryChargeCounter();
+                    startcurrentnow = getBatteryCurrentNow();
+                    startenergycounter = getBatteryEnergyCounter();
                     startbatteryalter = getChargeCountAlternative();
                     Log.d(TAG, "startbattery value : " + startbattery);
 //                    endBatteryTextView.setText("After batteryInMicroAmps: ");
@@ -490,6 +502,12 @@ public class MainActivity extends AppCompatActivity {
                                     PerformTest(test).join();
                                     startbattery = getChargeCounter();
                                     startbatteryalter = getChargeCountAlternative();
+                                    startbatterycapacity = getBatteryPropertyCapacity();
+                                    startchargecounter = getBatteryChargeCounter();
+                                    startcurrentnow = getBatteryCurrentNow();
+                                    startenergycounter = getBatteryEnergyCounter();
+                                    startbatteryalter = getChargeCountAlternative();
+                                    startavgcurrent = getAvgCurrent();
                                     Log.d(TAG, "startbattery value : " + startbattery);
                                 }
                             }
@@ -600,6 +618,35 @@ public class MainActivity extends AppCompatActivity {
             return batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1); // in mV
         }
         return -1; // fallback if not available
+    }
+
+    private int getBatteryPropertyCapacity() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+        }
+        return -1;
+    }
+    private int getBatteryChargeCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+        }
+        return -1;
+    }
+    private int getBatteryCurrentNow() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
+        }
+        return -1;
+    }
+    private long getBatteryEnergyCounter() {
+        BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+        if(batteryManager != null) {
+            return batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_ENERGY_COUNTER);
+        }
+        return -1;
     }
 
     private long getChargeCountAlternative() {
@@ -1270,6 +1317,10 @@ public class MainActivity extends AppCompatActivity {
                     endbattery = getChargeCounter();
                     endvoltage = getBatteryVoltage();
                     endavgcurrent = getAvgCurrent();
+                    endbatterycapacity = getBatteryPropertyCapacity();
+                    endchargecounter = getBatteryChargeCounter();
+                    endcurrentnow = getBatteryCurrentNow();
+                    endenergycounter = getBatteryEnergyCounter();
                     endbatteryalter = getChargeCountAlternative();
 //                    if((startbattery - endbattery) <= 0) {
 //                        endbattery = endbatteryalter;
@@ -1278,7 +1329,7 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Endbattery value : " + endbattery);
 //                    stats.LoopbackData(mLoopback, accumulatedtime);
 //                    stats.BatteryTest(startbatteryalter,endbatteryalter,voltage);
-                    stats.BatteryTest(startbattery,endbattery,voltage,startvoltage,endvoltage,startavgcurrent,endavgcurrent);
+                    stats.BatteryTest(startbattery,endbattery,voltage,startvoltage,endvoltage,startavgcurrent,endavgcurrent,startbatterycapacity,endbatterycapacity,startchargecounter,endchargecounter,startcurrentnow,endcurrentnow,startenergycounter,endenergycounter);
                     try {
                         Log.d(TAG, "Write stats for " + stats.getId() + " to " + fullFilename);
                         FileWriter fw = new FileWriter(fullFilename, true);

@@ -23,6 +23,11 @@ public class FrameInfo {
     int mBatteryVoltage = -1;
     int mAverageCurrent = -1;
 
+    int mBatteryCapacity = -1;
+    int mBatteryChargeCounter = -1;
+    int mBatteryCurrentNow = -1;
+    long mBatteryEnergyCounter = -1;
+
     Dictionary<String, Object> mInfo;
 
     public FrameInfo(long pts) {
@@ -109,6 +114,50 @@ public class FrameInfo {
                 : -1;
     }
 
+    public void setBatteryCapacity() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryCapacity = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryCapacity = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                : -1;
+    }
+
+    public void setBatteryChargeCounter() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryChargeCounter = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryChargeCounter = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
+                : -1;
+    }
+
+    public void setBatteryCurrentNow() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryCurrentNow = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryCurrentNow = (bm != null)
+                ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                : -1;
+    }
+
+    public void setBatteryEnergyCounter() {
+        Context ctx = MainActivity.getAppContext();
+        if (ctx == null) { mBatteryEnergyCounter = -1; return; }
+
+        BatteryManager bm = (BatteryManager) ctx.getSystemService(Context.BATTERY_SERVICE);
+        mBatteryEnergyCounter = (bm != null)
+                ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_ENERGY_COUNTER)
+                : -1;
+    }
+
     public int getBatteryVoltage() { return mBatteryVoltage; }
     public int getAverageCurrent() { return mAverageCurrent; }
+    public int getBatteryCapacity() { return mBatteryCapacity; }
+    public int getBatteryChargeCounter() { return mBatteryChargeCounter; }
+    public int getBatteryCurrentNow() { return mBatteryCurrentNow; }
+    public long getBatteryEnergyCounter() { return mBatteryEnergyCounter; }
 }
